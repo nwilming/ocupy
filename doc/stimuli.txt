@@ -1,0 +1,159 @@
+Organization of stimuli: categories, images and features
+========================================================
+
+This module aims at providing easy access to images and feature maps.
+It respects that images are organized in different categories. 
+
+Using this module has several advantages over simply loading images or 
+feature maps at runtime:
+    
+    #. **Alignment**: You can iterate over images and access all fixations made on this image. The access is handled transparently for you.
+    #. **Abstraction**: If treated right, it doesn't matter where or how your data is organized. Stored in the web? Strange naming conventions? No problem, but you will have to adapt some minor things in the backend. The interface however stays. 
+
+
+The graph below describes the dependency structure of classes within the stimulus module. The general idea is that images are organized in categories (one category maps to many images) and that images provide access to the raw image data and to features of the image (again a 1:n mapping). Data is loaded via a proxy class which abstracts from the actual access (this is a n:1 mapping). 
+
+.. graphviz::
+
+	digraph Stimuli {
+		node [shape = record,height=.1];
+		node0[label = "<f0> Category 1 | <f1> Category 2"];
+		node1[label = "<f0> Image 1 | ... | <f1> Image n"];
+		node2[label = "<f0> Image 1 | ... | <f1> Image n"];
+		node3[label = "<f0> Image Data | <f1> Feature 1 | ... | <f2> Feature n"];
+		node4[label = "<f0> Image Data | <f1> Feature 1 | ... | <f2> Feature n"];
+		"node0":f0 -> "node1":f0;
+		"node0":f1 -> "node2":f0;
+		"node1":f0 -> "node3":f0;
+		"node2":f0 -> "node4":f0;
+		"node4":f0 -> Loader;
+		"node4":f1 -> Loader;
+		"node4":f2 -> Loader;
+		"node3":f0 -> Loader;
+		"node3":f1 -> Loader;
+		"node3":f2 -> Loader;
+	}
+	
+The remainder of this document describes the interface of the stimuli
+module and how it interacts with the loader module.
+
+Loading Data from somewhere
+---------------------------
+To access images and feature maps, we need to be able to load them into 
+memory. This task is carried out by the *loader*. It encapsulates the
+direct data access, such that we do not have to worry about it later. 
+
+Let's look at an example:
+    
+    >>> l = loader.LoadFromDisk('my-images', 'my-features', size = (768,1024))
+    >>> l.get_image(2,17)
+    -> Returns image 17 in category 2
+    >>> l.get_feature(2,17,'BYCHigh')
+    -> Returns feature BYCHigh for image 17 in category 2
+
+In this case we use a loader that reads features and images from the hard disk.
+In the constructor, we specify where the images and features are located. A 
+neat functionality is that the 'LoadFromDisk' loader can automatically resize images and 
+features to the same size (given by the size argument). By default
+'LoadFromDisk'
+respects the following file layout: my-images/cat/cat_image.png 
+and my-features/cat/feature/cat_image.mat
+If you use a different naming scheme it is easy to rip the standard out and plug 
+in your naming scheme. All you have to do is to replace LoadFromDisk's 'path' function:
+    
+    >>> l = loader.LoadFromDisk('my-images', 'my-features', size = (768,1024))
+    >>> def my_path(self, *args):
+            if len(args) == 1:
+                return self.impath
+            elif len(args) == 2:
+                return os.path.join(self.impath, '%i_%i.png'%(args[0],args[1]))
+            elif len(args) == 3:
+                return os.path.join(self.impath, '%i_%i_%f.mat'%(args[0],args[1],args[2]))
+    >>> l.path = my_path 
+
+
+And now the loader will respect a my-images/cat_image.png and 
+my-images/cat_image_feature.mat naming scheme. You can of course also inherit
+from LoadFromDisk and overwrite the path method if you want to use this naming
+scheme more often.
+
+To use a completely different loader (say, one that pulls stimuli from a
+SQL database) you have to implement your own. To achieve this, inherit
+from loader.Loader and fill all methods specified there with life.
+
+
+Working with the stimulus module
+--------------------------------
+To abstract the data access is a first step but does not provide much in terms of
+convenience. The stimuli module defines three classes that organize stimuli into 
+categories, images and features:
+    
+    - The **Categories** class encapsulates different categories that are available
+    - The **Images** class represents all images within a category
+    - The **Image** class provides direct access to the image data and feature maps of the image
+
+I think the interface is pretty much self-explaining:
+    
+    >>> l = loader.LoadFromDisk('path-to-my-images', 'path-to-my-features', size = (768,1024))
+    >>> inp = stimuli.Categories(l, features=None,img_per_cat = {2:range(16,26),9:range(1,51)})
+    >>> inp[2][17].data # yields image 17 in category 2
+    >>> inp[2][17]['BYCHigh'] # yields feature BYCHigh
+    >>> for cat in inp:
+            for img in cat:
+                img.data # Gives the image
+                img['BYCHigh'] # Gives feature BYCHigh
+
+In this case, I specified all possible category / image combinations. 
+Often we want to access images and features that have been arranged by
+some structure beforehand. The most obvious case is that we have a fixmat that already specifies all possible category, and image combinations. To create a stimuli object that is aligned to a fixmat we can use the **FixmatStimuliFactory**:
+
+	>>> fm = fixmat.DirectoryFixmatFactory('path-to-fixmats')
+	>>> l = loader.LoadFromDisk(impath = 'path-to-imgs', ftrpath = 'path-to-ftrs')
+	>>> stim = stimuli.FixmatStimuliFactory(fm, l)
+
+Alternatively we can use the **DirectoryStimuliFactory** to automatically index all categories and files in a directory:
+
+    >>> stim = stimuli.DirectoryStimuliFactory(l)
+    >>> stim.categories()
+    [2,9]
+    >>> stim[2].images() 
+    [16, 17, ..., 25]
+    >>> stim[9].images()
+    [1, 2, ..., 50]
+
+This, however, works only for the default file layout structure (cat/cat_img.png, cat/ftr/cat_img.mat).
+
+Combining fixation data and stimulus data
+-----------------------------------------
+
+In many cases, we want to iterate over images and fixation data at the same
+time. The stimuli module automatically aligns fixation and image data. 
+
+To use this functionality the data proxy (i.e. categories, images or features)
+must be created with a FixMat:
+
+    >>> fm = fixmat.DirectoryFixmatFactory('my-fixmats')
+    >>> inp = stimuli.Categories(l,fixations = fm)
+    >>> inp[2][17].fixations 
+    -> FixMat that contains only fixations on image 17 fron category 2
+
+If the data proxy is initialized with a set of possible category / image
+combinations we can also iterate over it. In this case it is probably 
+handy to use the FixmatStimuliFactory which extracts all possible
+category / image combinations from a fixmat:
+    
+    >>> inp = stimuli.FixmatStimuliFactory(fm,l)
+    >>> for cat in inp:
+            for img in cat:
+                img.fixations 
+
+
+Reference
+---------
+.. autofunction:: ocupy.stimuli.FixmatStimuliFactory
+.. autofunction:: ocupy.stimuli.DirectoryStimuliFactory
+
+.. automodule:: ocupy.stimuli
+
+.. automodule:: ocupy.loader
+

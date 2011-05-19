@@ -1,0 +1,210 @@
+Parallel
+========
+
+.. module:: res.analysis.parallel
+
+This module implements functionality to parallelize massively 
+parallel tasks. A massively parallel task consists of repeatedly 
+carrying out the same computation. Each individual computation 
+might depend on different parameters but there exist no dpendencies
+between different tasks. 
+
+This module provides three different classes to achieve massive 
+prallelization: :ref:`TaskStore <TaskStore>`, :ref:`TaskManager <TaskManager>`  and :ref:`Worker <Worker>`
+
+Each module characterizes one of three steps that is necessary:
+    1. Provide a task description and an ordering of tasks
+    2. Make tasks available for parallel processing
+    3. Carry out a task
+
+These classes work together to process tasks in a parallel fashion.
+The TaskStore provides an interface that allows to iterate over 
+individual task descriptions. The TaskManager is a XMLRPC server
+which provides task descriptions for workers. A Worker is a XMLRPC
+client that connects to a task manager and retrieves a task description,
+executes the task and sends back the results.
+ 
+
+Organizing tasks for distribution
+---------------------------------
+.. _TaskStore:
+
+Preparing your own tasks for parallel computation starts with providing a
+custom TaskStore object. A task store organizes how a complete task can be 
+divided into smaller tasks. Let's consider an example. Say we want to compute 
+how well a single  subject can be predicted by some other random subject. In 
+this case, a task might be the calculation of one prediction score. The entire task 
+is to calculate scores for predicting each subject with each other subject.
+If we have 48 subjects, we have 48*47 individual tasks.
+
+A single task is usually described by a dictionary that has as keys the name
+of a parameter and as value the value of a parameter::
+
+    for (index, task) in task_store: print task
+    {'index':1,'predicted_sub':10,'predicting_sub':10}  
+
+Internally a task store deals only with a linear index into all possible tasks.
+To provide a custom task store you have implement a class that inherits from parallel.TaskStore
+and implements four functions:
+
+    1. get(index, \*params)   -   A function that returns a task description
+    2. sub2ind(\*params)    -   A function that maps parameters to a linear index
+    3. ind2sub(index)        -   A function that maps a linear index to a set of parameters
+    4. update_results(task_index, task_results)     -   A function that takes the results for a task and saves 'em / organizes 'em.
+ 
+An example implementation is given below::
+
+    class ISTaskStore(parallel.TaskStore):
+        def __init__(self, partitions = 100,ind = None, filename = None):
+            parallel.TaskStore.__init__(self,partitions, ind, None)
+            self.num_tasks = 48 * 47 # This is required!
+            self.results = np.nan * np.ones((48,47))
+        def get(self, index,predicting, predicted):
+            if index == None:
+                index = self.sub2ind(predicting, predicted)
+            return {'index':index, 'predicting':predicting, 'predicted':predicted}
+        
+        def sub2ind(self, predicting, predicted):
+            # parallel.sub2ind maps 1 <- (1,1), 2 <- (1,2) ... 47 <- (1,47), 48 <- (2,1) etc.
+            return parallel.sub2ind((predicting, predicted), (48,47))
+        
+        def ind2sub(self, index):
+            # parallel.sub2ind maps 1 -> (1,1), 2 -> (1,2), ... 47 -> (1,47), 48 -> (2,1) etc. 
+            return parallel.ind2sub(index,(48,47))
+        
+        def update_results(self, task_index, task_results):
+           for cur_res in task_results:
+                # Find position for this result in result matrix
+                ind = cur_res['index']
+                params = self.ind2sub(ind)
+                self.results[params] = cur_res['result']     
+        
+Let's see what this does::
+
+ from res.analysis import parallel
+ ts = ISTaskStore()
+ ts.get(None, 1,1)
+    {'index': 0, 'predicted': 1, 'predicting': 1}
+ ts.get(None, 2,1)
+     {'index': 47, 'predicted': 1, 'predicting': 2}
+
+
+The task store provides an iterator interface that allows to iterate over all 
+tasks in the task store.:: 
+
+ for task in ts: print task
+ # Will list all tasks
+
+An important property of a task store is that it can *partition* itself into
+smaller groups of subtask. Often computing the result of a single task comes 
+with significant overhead, thus each worker receives a group of tasks (which 
+is represented again by a TaskStore object) and then iterates over all tasks 
+in the store. Every task store object can be instantiated with a list of valid
+indices, such that iterating through the store iterates only through these tasks.::
+
+ ts = ISTaskStore(indices=[1,2,3])
+ for task in ts: print task 
+    (1, {'index': 1, 'predicting': 1, 'predicted': 2})
+    (2, {'index': 2, 'predicting': 1, 'predicted': 3})
+    (3, {'index': 3, 'predicting': 1, 'predicted': 4})
+
+
+Another important function of a task store is *update_results(self, task_id, task_description)*
+It is called by the server whenever the results for a partition were returned by
+a worker. This function has to be implemented by you and gives you a 
+chance to put the results back into a form that you can interpret and *save*! 
+
+One more thing: TaskStores and Workers usually come in pairs. To avoid that you
+use a worker that was not intended to be used with a specific TaskStore a task store needs
+to be able to identify itself. It therefore needs to have a field .ident which 
+needs to be set by you.
+
+
+Making tasks available for processing
+-------------------------------------
+.. _TaskManager:
+
+When a task store object is available we can start a server that waits 
+for workers to pick up tasks. To do so, we create an instance of 
+TaskManager and run it::
+
+ from twisted.internet import reactor 
+ from twisted.web import xmlrpc, server
+ r = parallel.TaskManager(task_store)
+ reactor.listenTCP(7080, server.Site(r))
+ reactor.run()
+
+It is best to do this in a screen and then detach the screen.
+You can check that it is running by firing up ipython and typing::
+
+ import xmlrpclib
+ s = xmlrpclib.Server('http://localhost:7080')
+ print s.status()
+     100 Jobs are still wating for execution
+     0 Jobs are being processed
+     0 Jobs are done
+
+Remember that the server iterates over partitions (and the default number 
+of partitions is 100), thus for the server one job is one partition of the tasks.
+You can query the server with the server object::
+
+ k = s.get_task()
+ s.reschedule() # Reschedule all tasks that are being processed
+
+Getting things done
+-------------------
+.. _Worker:
+
+When everything is in place (task store available, server started) it is time to 
+actually do the work. For this we create instances of parallel.Worker.
+
+Each worker instance will then connect to the server, call server.get_task(), iterate over 
+the returned task_store and call *compute(self, index, task_description)* for each task.
+It collects the output for each compute call and returns it to the server and then quits.
+
+Often the worker needs access to data that needs to be loaded beforehand. Thus, the 
+constructor of parallel. Worker calls *setup(self)* before starting the computation. 
+This gives you a chance to organize the necessary data.
+
+The only tasks left to you are implementing a setup and a compute method. Here is an example::
+
+    class ISWorker(parallel.Worker):
+        
+        def setup(self):
+            prefix = '/net/space/users/nwilming/'
+            data = fixmat.FixmatFactory(os.path.join(prefix,'fixmat.mat'))
+            self.data = data[(data.on_image == True) & (ismember(data.fix, range(2,17)))]
+
+        def compute(self, index, task_description):
+            predicted  = task_description['predicted']
+            predicting = task_description['predicting']
+            rescale = 0.5
+            (auc, nss, kl) = roc.intersubject_scores(self.data, 7, [1],
+                                    predicting, range(2,65),
+                                    predicted, controls = False, scale_factor = rescale)        
+            
+            result = {'index': index, 
+                    'auc' : float(auc),
+                    'nss' : float(nss),
+                    'kl' : float(kl)}
+            result.update(task_description)
+            return result
+
+To start a worker, instantiate it and call it's run() function. The rest happens 
+automatically.
+
+The real power of this approach lies in using the GridEngine to start as many workers as 
+there are task partitions. The GridEngine then starts as many workers as is possible.
+
+
+Reference
+---------
+
+.. autoclass:: TaskStore
+    :members:
+
+.. autoclass:: TaskManager
+    :members:
+
+.. autoclass:: Worker
+    :members:
