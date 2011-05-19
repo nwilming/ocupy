@@ -1,0 +1,482 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Parallel &mdash; ocupy v0.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="ocupy v0.1 documentation" href="index.html" />
+    <link rel="next" title="Organization of stimuli: categories, images and features" href="stimuli.html" />
+    <link rel="prev" title="FixMat" href="fixmat.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="stimuli.html" title="Organization of stimuli: categories, images and features"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="fixmat.html" title="FixMat"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-res.analysis.parallel">
+<span id="parallel"></span><h1>Parallel<a class="headerlink" href="#module-res.analysis.parallel" title="Permalink to this headline">¶</a></h1>
+<p>This module implements functionality to parallelize massively
+parallel tasks. A massively parallel task consists of repeatedly
+carrying out the same computation. Each individual computation
+might depend on different parameters but there exist no dpendencies
+between different tasks.</p>
+<p>This module provides three different classes to achieve massive
+prallelization: <a class="reference internal" href="#taskstore"><em>TaskStore</em></a>, <a class="reference internal" href="#taskmanager"><em>TaskManager</em></a>  and <a class="reference internal" href="#worker"><em>Worker</em></a></p>
+<dl class="docutils">
+<dt>Each module characterizes one of three steps that is necessary:</dt>
+<dd><ol class="first last arabic simple">
+<li>Provide a task description and an ordering of tasks</li>
+<li>Make tasks available for parallel processing</li>
+<li>Carry out a task</li>
+</ol>
+</dd>
+</dl>
+<p>These classes work together to process tasks in a parallel fashion.
+The TaskStore provides an interface that allows to iterate over
+individual task descriptions. The TaskManager is a XMLRPC server
+which provides task descriptions for workers. A Worker is a XMLRPC
+client that connects to a task manager and retrieves a task description,
+executes the task and sends back the results.</p>
+<div class="section" id="organizing-tasks-for-distribution">
+<h2>Organizing tasks for distribution<a class="headerlink" href="#organizing-tasks-for-distribution" title="Permalink to this headline">¶</a></h2>
+<p id="taskstore">Preparing your own tasks for parallel computation starts with providing a
+custom TaskStore object. A task store organizes how a complete task can be
+divided into smaller tasks. Let&#8217;s consider an example. Say we want to compute
+how well a single  subject can be predicted by some other random subject. In
+this case, a task might be the calculation of one prediction score. The entire task
+is to calculate scores for predicting each subject with each other subject.
+If we have 48 subjects, we have 48*47 individual tasks.</p>
+<p>A single task is usually described by a dictionary that has as keys the name
+of a parameter and as value the value of a parameter:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">for</span> <span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">task</span><span class="p">)</span> <span class="ow">in</span> <span class="n">task_store</span><span class="p">:</span> <span class="k">print</span> <span class="n">task</span>
+<span class="p">{</span><span class="s">&#39;index&#39;</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="s">&#39;predicted_sub&#39;</span><span class="p">:</span><span class="mi">10</span><span class="p">,</span><span class="s">&#39;predicting_sub&#39;</span><span class="p">:</span><span class="mi">10</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Internally a task store deals only with a linear index into all possible tasks.
+To provide a custom task store you have implement a class that inherits from parallel.TaskStore
+and implements four functions:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li>get(index, *params)   -   A function that returns a task description</li>
+<li>sub2ind(*params)    -   A function that maps parameters to a linear index</li>
+<li>ind2sub(index)        -   A function that maps a linear index to a set of parameters</li>
+<li>update_results(task_index, task_results)     -   A function that takes the results for a task and saves &#8216;em / organizes &#8216;em.</li>
+</ol>
+</div></blockquote>
+<p>An example implementation is given below:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">ISTaskStore</span><span class="p">(</span><span class="n">parallel</span><span class="o">.</span><span class="n">TaskStore</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">partitions</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span><span class="n">ind</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="n">parallel</span><span class="o">.</span><span class="n">TaskStore</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">partitions</span><span class="p">,</span> <span class="n">ind</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_tasks</span> <span class="o">=</span> <span class="mi">48</span> <span class="o">*</span> <span class="mi">47</span> <span class="c"># This is required!</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">48</span><span class="p">,</span><span class="mi">47</span><span class="p">))</span>
+    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span><span class="n">predicting</span><span class="p">,</span> <span class="n">predicted</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">index</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub2ind</span><span class="p">(</span><span class="n">predicting</span><span class="p">,</span> <span class="n">predicted</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s">&#39;index&#39;</span><span class="p">:</span><span class="n">index</span><span class="p">,</span> <span class="s">&#39;predicting&#39;</span><span class="p">:</span><span class="n">predicting</span><span class="p">,</span> <span class="s">&#39;predicted&#39;</span><span class="p">:</span><span class="n">predicted</span><span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">sub2ind</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">predicting</span><span class="p">,</span> <span class="n">predicted</span><span class="p">):</span>
+        <span class="c"># parallel.sub2ind maps 1 &lt;- (1,1), 2 &lt;- (1,2) ... 47 &lt;- (1,47), 48 &lt;- (2,1) etc.</span>
+        <span class="k">return</span> <span class="n">parallel</span><span class="o">.</span><span class="n">sub2ind</span><span class="p">((</span><span class="n">predicting</span><span class="p">,</span> <span class="n">predicted</span><span class="p">),</span> <span class="p">(</span><span class="mi">48</span><span class="p">,</span><span class="mi">47</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">ind2sub</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="c"># parallel.sub2ind maps 1 -&gt; (1,1), 2 -&gt; (1,2), ... 47 -&gt; (1,47), 48 -&gt; (2,1) etc.</span>
+        <span class="k">return</span> <span class="n">parallel</span><span class="o">.</span><span class="n">ind2sub</span><span class="p">(</span><span class="n">index</span><span class="p">,(</span><span class="mi">48</span><span class="p">,</span><span class="mi">47</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">update_results</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">task_index</span><span class="p">,</span> <span class="n">task_results</span><span class="p">):</span>
+       <span class="k">for</span> <span class="n">cur_res</span> <span class="ow">in</span> <span class="n">task_results</span><span class="p">:</span>
+            <span class="c"># Find position for this result in result matrix</span>
+            <span class="n">ind</span> <span class="o">=</span> <span class="n">cur_res</span><span class="p">[</span><span class="s">&#39;index&#39;</span><span class="p">]</span>
+            <span class="n">params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ind2sub</span><span class="p">(</span><span class="n">ind</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="n">params</span><span class="p">]</span> <span class="o">=</span> <span class="n">cur_res</span><span class="p">[</span><span class="s">&#39;result&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Let&#8217;s see what this does:</p>
+<div class="highlight-python"><pre>from res.analysis import parallel
+ts = ISTaskStore()
+ts.get(None, 1,1)
+   {'index': 0, 'predicted': 1, 'predicting': 1}
+ts.get(None, 2,1)
+    {'index': 47, 'predicted': 1, 'predicting': 2}</pre>
+</div>
+<p>The task store provides an iterator interface that allows to iterate over all
+tasks in the task store.:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">ts</span><span class="p">:</span> <span class="k">print</span> <span class="n">task</span>
+<span class="c"># Will list all tasks</span>
+</pre></div>
+</div>
+<p>An important property of a task store is that it can <em>partition</em> itself into
+smaller groups of subtask. Often computing the result of a single task comes
+with significant overhead, thus each worker receives a group of tasks (which
+is represented again by a TaskStore object) and then iterates over all tasks
+in the store. Every task store object can be instantiated with a list of valid
+indices, such that iterating through the store iterates only through these tasks.:</p>
+<div class="highlight-python"><pre>ts = ISTaskStore(indices=[1,2,3])
+for task in ts: print task
+   (1, {'index': 1, 'predicting': 1, 'predicted': 2})
+   (2, {'index': 2, 'predicting': 1, 'predicted': 3})
+   (3, {'index': 3, 'predicting': 1, 'predicted': 4})</pre>
+</div>
+<p>Another important function of a task store is <em>update_results(self, task_id, task_description)</em>
+It is called by the server whenever the results for a partition were returned by
+a worker. This function has to be implemented by you and gives you a
+chance to put the results back into a form that you can interpret and <em>save</em>!</p>
+<p>One more thing: TaskStores and Workers usually come in pairs. To avoid that you
+use a worker that was not intended to be used with a specific TaskStore a task store needs
+to be able to identify itself. It therefore needs to have a field .ident which
+needs to be set by you.</p>
+</div>
+<div class="section" id="making-tasks-available-for-processing">
+<h2>Making tasks available for processing<a class="headerlink" href="#making-tasks-available-for-processing" title="Permalink to this headline">¶</a></h2>
+<p id="taskmanager">When a task store object is available we can start a server that waits
+for workers to pick up tasks. To do so, we create an instance of
+TaskManager and run it:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">twisted.internet</span> <span class="kn">import</span> <span class="n">reactor</span>
+<span class="kn">from</span> <span class="nn">twisted.web</span> <span class="kn">import</span> <span class="n">xmlrpc</span><span class="p">,</span> <span class="n">server</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">parallel</span><span class="o">.</span><span class="n">TaskManager</span><span class="p">(</span><span class="n">task_store</span><span class="p">)</span>
+<span class="n">reactor</span><span class="o">.</span><span class="n">listenTCP</span><span class="p">(</span><span class="mi">7080</span><span class="p">,</span> <span class="n">server</span><span class="o">.</span><span class="n">Site</span><span class="p">(</span><span class="n">r</span><span class="p">))</span>
+<span class="n">reactor</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>It is best to do this in a screen and then detach the screen.
+You can check that it is running by firing up ipython and typing:</p>
+<div class="highlight-python"><pre>import xmlrpclib
+s = xmlrpclib.Server('http://localhost:7080')
+print s.status()
+    100 Jobs are still wating for execution
+    0 Jobs are being processed
+    0 Jobs are done</pre>
+</div>
+<p>Remember that the server iterates over partitions (and the default number
+of partitions is 100), thus for the server one job is one partition of the tasks.
+You can query the server with the server object:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">k</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">get_task</span><span class="p">()</span>
+<span class="n">s</span><span class="o">.</span><span class="n">reschedule</span><span class="p">()</span> <span class="c"># Reschedule all tasks that are being processed</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="getting-things-done">
+<h2>Getting things done<a class="headerlink" href="#getting-things-done" title="Permalink to this headline">¶</a></h2>
+<p id="worker">When everything is in place (task store available, server started) it is time to
+actually do the work. For this we create instances of parallel.Worker.</p>
+<p>Each worker instance will then connect to the server, call server.get_task(), iterate over
+the returned task_store and call <em>compute(self, index, task_description)</em> for each task.
+It collects the output for each compute call and returns it to the server and then quits.</p>
+<p>Often the worker needs access to data that needs to be loaded beforehand. Thus, the
+constructor of parallel. Worker calls <em>setup(self)</em> before starting the computation.
+This gives you a chance to organize the necessary data.</p>
+<p>The only tasks left to you are implementing a setup and a compute method. Here is an example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">ISWorker</span><span class="p">(</span><span class="n">parallel</span><span class="o">.</span><span class="n">Worker</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">prefix</span> <span class="o">=</span> <span class="s">&#39;/net/space/users/nwilming/&#39;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">FixmatFactory</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span><span class="s">&#39;fixmat.mat&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[(</span><span class="n">data</span><span class="o">.</span><span class="n">on_image</span> <span class="o">==</span> <span class="bp">True</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">ismember</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">fix</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">17</span><span class="p">)))]</span>
+
+    <span class="k">def</span> <span class="nf">compute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">task_description</span><span class="p">):</span>
+        <span class="n">predicted</span>  <span class="o">=</span> <span class="n">task_description</span><span class="p">[</span><span class="s">&#39;predicted&#39;</span><span class="p">]</span>
+        <span class="n">predicting</span> <span class="o">=</span> <span class="n">task_description</span><span class="p">[</span><span class="s">&#39;predicting&#39;</span><span class="p">]</span>
+        <span class="n">rescale</span> <span class="o">=</span> <span class="mf">0.5</span>
+        <span class="p">(</span><span class="n">auc</span><span class="p">,</span> <span class="n">nss</span><span class="p">,</span> <span class="n">kl</span><span class="p">)</span> <span class="o">=</span> <span class="n">roc</span><span class="o">.</span><span class="n">intersubject_scores</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                                <span class="n">predicting</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">65</span><span class="p">),</span>
+                                <span class="n">predicted</span><span class="p">,</span> <span class="n">controls</span> <span class="o">=</span> <span class="bp">False</span><span class="p">,</span> <span class="n">scale_factor</span> <span class="o">=</span> <span class="n">rescale</span><span class="p">)</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;index&#39;</span><span class="p">:</span> <span class="n">index</span><span class="p">,</span>
+                <span class="s">&#39;auc&#39;</span> <span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">auc</span><span class="p">),</span>
+                <span class="s">&#39;nss&#39;</span> <span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">nss</span><span class="p">),</span>
+                <span class="s">&#39;kl&#39;</span> <span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">kl</span><span class="p">)}</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">task_description</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+</pre></div>
+</div>
+<p>To start a worker, instantiate it and call it&#8217;s run() function. The rest happens
+automatically.</p>
+<p>The real power of this approach lies in using the GridEngine to start as many workers as
+there are task partitions. The GridEngine then starts as many workers as is possible.</p>
+</div>
+<div class="section" id="reference">
+<h2>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="res.analysis.parallel.TaskStore">
+<em class="property">class </em><tt class="descclassname">res.analysis.parallel.</tt><tt class="descname">TaskStore</tt><big>(</big><em>num_partitions=100</em>, <em>indices=None</em>, <em>filename=None</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskStore" title="Permalink to this definition">¶</a></dt>
+<dd><p>A TaskStore manages a set of tasks.</p>
+<p>A task in a task store consists of a dictionary that has uses keys
+that are meaningfull to a worker&#8217;s compute method. I.e. the keys name
+parameters for the compute method and the values are the values of these
+parameters.</p>
+<p>A task store can partition itself into groups of tasks via the
+partition function. It returns task store objects that only access a subset 
+of all tasks. This is achieved by creating the task store object with a 
+linear index of tasks.</p>
+<p>A task store object can also iterate over tasks directly and return
+the dictionary that is associated with each task. Consequently a 
+task store that has received task indices upon creation will only 
+iterate over the tasks indexed by the indices.</p>
+<p>The current implementation and concepts used imply that a task_store
+object is fully defined by the number of partitions it creates and
+the indices it posses. It is de facto stateless.</p>
+<p>To send a task_store via a XML-RPC call it is necessary to serialize
+it into a dictionary which is performed by the functions
+from_dict and to_dict.</p>
+<dl class="method">
+<dt id="res.analysis.parallel.TaskStore.from_dict">
+<tt class="descname">from_dict</tt><big>(</big><em>description</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskStore.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Configures the task store to be the task_store described 
+in description</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskStore.get">
+<tt class="descname">get</tt><big>(</big><em>index</em>, <em>*params</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskStore.get" title="Permalink to this definition">¶</a></dt>
+<dd><p>User implemented method that returns a task description
+for a set of parameters. This allows to create complex
+task, i.e. this function can add information to a task
+description that is dependent on the parameters.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskStore.ind2sub">
+<tt class="descname">ind2sub</tt><big>(</big><em>index</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskStore.ind2sub" title="Permalink to this definition">¶</a></dt>
+<dd><p>Map index to a set of parameters.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskStore.partition">
+<tt class="descname">partition</tt><big>(</big><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskStore.partition" title="Permalink to this definition">¶</a></dt>
+<dd><p>Partitions all tasks into groups of tasks. A group is
+represented by a task_store object that indexes a sub-
+set of tasks.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskStore.sub2ind">
+<tt class="descname">sub2ind</tt><big>(</big><em>*params</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskStore.sub2ind" title="Permalink to this definition">¶</a></dt>
+<dd><p>Map a set of parameters to linear index.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskStore.to_dict">
+<tt class="descname">to_dict</tt><big>(</big><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskStore.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a dictionary representation that allows to fully 
+recreate the task store</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskStore.update_results">
+<tt class="descname">update_results</tt><big>(</big><em>task_id</em>, <em>task_description</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskStore.update_results" title="Permalink to this definition">¶</a></dt>
+<dd><p>User implemented method that organizes results into some
+structure and takes care of saving it</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="res.analysis.parallel.TaskManager">
+<em class="property">class </em><tt class="descclassname">res.analysis.parallel.</tt><tt class="descname">TaskManager</tt><big>(</big><em>task_store</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskManager" title="Permalink to this definition">¶</a></dt>
+<dd><p>A server that distributes tasks to connecting clients and collects results.</p>
+<p>This class is a generic implementation of an XML-RPC server that iterates
+over a task_store object and distributes tasks which are stored in the 
+task_store.</p>
+<p>A client that connects to this server via XML-RPC is expected to carry 
+out the following steps:</p>
+<p>1. It calls get_task upon which the server returns a tuple that 
+contains an id and a serialized task_store object that contains a 
+subset of all tasks. The task store object is serialized via
+task_store.to_dict()
+2. The client iterates over all tasks in the task_store it received
+and returns the results as a tuple that contains the task_store
+id received from get task and the results.
+3. If get_task returns false, the client exits.</p>
+<p>To collect status updates and results of the computations a client
+can connect and call get_status or return_results.</p>
+<dl class="method">
+<dt id="res.analysis.parallel.TaskManager.xmlrpc_exit">
+<tt class="descname">xmlrpc_exit</tt><big>(</big><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskManager.xmlrpc_exit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Terminates server</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskManager.xmlrpc_get_task">
+<tt class="descname">xmlrpc_get_task</tt><big>(</big><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskManager.xmlrpc_get_task" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a new task description: ID and necessary parameters, all are given
+in a dictionary</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskManager.xmlrpc_reschedule">
+<tt class="descname">xmlrpc_reschedule</tt><big>(</big><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskManager.xmlrpc_reschedule" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reschedule all running tasks.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskManager.xmlrpc_save2file">
+<tt class="descname">xmlrpc_save2file</tt><big>(</big><em>filename</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskManager.xmlrpc_save2file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save results and own state into file.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskManager.xmlrpc_status">
+<tt class="descname">xmlrpc_status</tt><big>(</big><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskManager.xmlrpc_status" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a status message</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.TaskManager.xmlrpc_task_done">
+<tt class="descname">xmlrpc_task_done</tt><big>(</big><em>result</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.TaskManager.xmlrpc_task_done" title="Permalink to this definition">¶</a></dt>
+<dd><p>Take the results of a computation and put it into the results list.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="res.analysis.parallel.Worker">
+<em class="property">class </em><tt class="descclassname">res.analysis.parallel.</tt><tt class="descname">Worker</tt><big>(</big><em>url</em>, <em>task_store</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.Worker" title="Permalink to this definition">¶</a></dt>
+<dd><p>A base for XML-RPC clients that do work for a TaskManager.</p>
+<p>The client works as follows: It connects to a server and calls
+get_task. It then configures it&#8217;s own task object by calling
+task_store.from_dict(dict) and iterates over the task in it&#8217;s
+own task_store.</p>
+<p>Each iteration returns one task_description that is used as
+an argument for the compute method. Whatever is returned as
+a result from compute is returned to the TaskManager.</p>
+<p>To implement a specific worker for your own task, the only
+thing to do is to implement the compute method. 
+If the worker needs to load data or other things that are 
+needed for each task, the setup method can be used. Setup is
+called when the Worker inits.</p>
+<dl class="method">
+<dt id="res.analysis.parallel.Worker.compute">
+<tt class="descname">compute</tt><big>(</big><em>index</em>, <em>task_description</em><big>)</big><a class="headerlink" href="#res.analysis.parallel.Worker.compute" title="Permalink to this definition">¶</a></dt>
+<dd><p>The compute function returns the results for the task 
+described by task_description. Task description contains
+a dictionary that refers to parameters and values are the
+corresponding values.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.Worker.run">
+<tt class="descname">run</tt><big>(</big><big>)</big><a class="headerlink" href="#res.analysis.parallel.Worker.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>This function needs to be called to start the computation.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="res.analysis.parallel.Worker.setup">
+<tt class="descname">setup</tt><big>(</big><big>)</big><a class="headerlink" href="#res.analysis.parallel.Worker.setup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called before compute is called for the firs time.
+Can be used to set up data and so forth</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/logo.png" alt="Logo"/>
+            </a></p>
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Parallel</a><ul>
+<li><a class="reference internal" href="#organizing-tasks-for-distribution">Organizing tasks for distribution</a></li>
+<li><a class="reference internal" href="#making-tasks-available-for-processing">Making tasks available for processing</a></li>
+<li><a class="reference internal" href="#getting-things-done">Getting things done</a></li>
+<li><a class="reference internal" href="#reference">Reference</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="fixmat.html"
+                        title="previous chapter">FixMat</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="stimuli.html"
+                        title="next chapter">Organization of stimuli: categories, images and features</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/parallel.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="stimuli.html" title="Organization of stimuli: categories, images and features"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="fixmat.html" title="FixMat"
+             >previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, WhiteMatter Labs GmbH.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>

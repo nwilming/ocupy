@@ -1,0 +1,700 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>FixMat &mdash; ocupy v0.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="ocupy v0.1 documentation" href="index.html" />
+    <link rel="next" title="Parallel" href="parallel.html" />
+    <link rel="prev" title="Welcome to ocupy’s documentation!" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="parallel.html" title="Parallel"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to ocupy’s documentation!"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-ocupy.fixmat">
+<span id="fixmat"></span><h1>FixMat<a class="headerlink" href="#module-ocupy.fixmat" title="Permalink to this headline">¶</a></h1>
+<p>This module wraps access to fixation data into a convenient data structure: a fixmat.
+A fixmat represents the data recorded with an eye-tracker. That is, it provides acces to
+all fixation events and their associated meta data. A fixation event describes a fixation
+made by a subject (it is automatically detected by the eye-tracker). Such an event is
+defined by the fixation position on screen (x,y) and its start and end time. To be useful,
+it is also necessary to record other metadata like the image the fixation was made on,
+the subject that made the fixations, and so forth.</p>
+<p>A fixmat is an object that groups this information and provides a rather convenient
+interface for accessing the information. It is heavily inspired by the matlab structures
+that most people seem to be using in the lab. The fixmat module is very similar in the
+way how the data is accessed.</p>
+<p>Currently fixmats can only be created from existing matlab fixmat structures. There
+is not yet a python script that invokes edfread directly and parses it&#8217;s output into
+the corresponding python structure. Also, to maintain compatibility it is recommended
+to save python fixmats as matlab structures that can be used by people which are still
+stuck with matlab.</p>
+<p>This document describes the most important properties of fixmats in three steps.
+First, it explains how fixmats can be created from existing data, second it shows
+some typical examples of how the fixmat can be used and third it shows how a fixation
+density map can be computed.</p>
+<div class="section" id="generating-a-fixmat">
+<h2>Generating a fixmat<a class="headerlink" href="#generating-a-fixmat" title="Permalink to this headline">¶</a></h2>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Currently fixmats can not be created
+from raw EDF files by just using python. This means, you have to use
+matlab and edfread to convert the raw data into a matlab fixmat.</p>
+</div>
+<dl class="docutils">
+<dt>There are three ways to create a fixmat:</dt>
+<dd><ol class="first last arabic simple">
+<li>Load a single matlab fixmat file from disk (fixmat.FixmatFactory)</li>
+<li>Concatenate all fixmats in a directory (fixmat.DirectoryFixmatFactory</li>
+<li>Create a fixmat for testing purposes (fixmat.TestFactory)</li>
+</ol>
+</dd>
+</dl>
+<div class="section" id="using-the-fixmatfactory">
+<h3>Using the FixmatFactory<a class="headerlink" href="#using-the-fixmatfactory" title="Permalink to this headline">¶</a></h3>
+<p>The fixmat factory loads a single existing matlab fixmat and returns a
+python fixmat object.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">ocupy.fixmat</span> <span class="kn">import</span> <span class="n">FixmatFactory</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;../ocupy/tests/fixmat_demo.mat&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="function">
+<dt id="ocupy.fixmat.FixmatFactory">
+<tt class="descclassname">ocupy.fixmat.</tt><tt class="descname">FixmatFactory</tt><big>(</big><em>fixmatfile</em>, <em>categories=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixmatFactory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixmatFactory" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads a single fixmat (fixmatfile).</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>fixmatfile <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>The matlab fixmat that should be loaded.</dd>
+<dt>categories <span class="classifier-delimiter">:</span> <span class="classifier">instance of stimuli.Categories, optional</span></dt>
+<dd>Links data in categories to data in fixmat.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="section" id="using-the-directoryfixmatfactory">
+<h3>Using the DirectoryFixmatFactory<a class="headerlink" href="#using-the-directoryfixmatfactory" title="Permalink to this headline">¶</a></h3>
+<p>The DirectoryFixmatFactory loads all *.mat files in a directory (assuming
+they&#8217;re fixmats) and concatenates these into on big fixmat.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">ocupy.fixmat</span> <span class="kn">import</span> <span class="n">DirectoryFixmatFactory</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;demo/&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="function">
+<dt id="ocupy.fixmat.DirectoryFixmatFactory">
+<tt class="descclassname">ocupy.fixmat.</tt><tt class="descname">DirectoryFixmatFactory</tt><big>(</big><em>directory</em>, <em>categories=None</em>, <em>glob_str='*.mat'</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#DirectoryFixmatFactory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.DirectoryFixmatFactory" title="Permalink to this definition">¶</a></dt>
+<dd><p>Concatenates all fixmats in dir and returns the resulting single
+fixmat.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>directory <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>Path from which the fixmats should be loaded</dd>
+<dt>categories <span class="classifier-delimiter">:</span> <span class="classifier">instance of stimuli.Categories, optional</span></dt>
+<dd>If given, the resulting fixmat provides direct access
+to the data in the categories object.</dd>
+<dt>glob_str <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>A regular expression that defines which mat files are picked up</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd><dl class="first last docutils">
+<dt>f_all <span class="classifier-delimiter">:</span> <span class="classifier">instance of FixMat</span></dt>
+<dd>Contains all fixmats that were found in given directory</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="section" id="using-the-testfixmatfactory">
+<h3>Using the TestFixmatFactory<a class="headerlink" href="#using-the-testfixmatfactory" title="Permalink to this headline">¶</a></h3>
+<p>Fixmats created with the TestFixmatFactory can be used to write automated
+tests that require some fixation data. What data goes into the fixmat can
+be controlled by different parameters in the constructor.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">ocupy.fixmat</span> <span class="kn">import</span> <span class="n">TestFixmatFactory</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">TestFixmatFactory</span><span class="p">(</span><span class="n">categories</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">filenumbers</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">subjectindices</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">fm</span>
+<span class="go">Fixmat with 24894 fixations and the following data fields:</span>
+<span class="go">          Field Name |     Length    |    Type    |        Values</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">                   x |     24894     |  float64   |         Many</span>
+<span class="go">                   y |     24894     |  float64   |         Many</span>
+<span class="go">        SUBJECTINDEX |     24894     |  float64   |    [ 1.  2.  3.]</span>
+<span class="go">          filenumber |     24894     |  float64   |    [ 1.  2.  3.]</span>
+<span class="go">            category |     24894     |  float64   |    [ 1.  2.  3.]</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">      Parameter Name | Value</span>
+<span class="go">---------------------+---------------------------------------------</span>
+<span class="go">   pixels_per_degree | 36</span>
+<span class="go">          image_size | [922, 1272]</span>
+</pre></div>
+</div>
+<dl class="function">
+<dt id="ocupy.fixmat.TestFixmatFactory">
+<tt class="descclassname">ocupy.fixmat.</tt><tt class="descname">TestFixmatFactory</tt><big>(</big><em>points=None, categories=[1], filenumbers=[1], subjectindices=[1], params=None, categories_obj=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#TestFixmatFactory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.TestFixmatFactory" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a fixmat where the content is known.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>points <span class="classifier-delimiter">:</span> <span class="classifier">list, optional</span></dt>
+<dd>This list contains coordinates of fixations. I.e. list[0] contains x 
+and list[1] contains y. If omitted, the line that connects (0,0) 
+and (922,922) is used.</dd>
+<dt>category <span class="classifier-delimiter">:</span> <span class="classifier">list, default = [1]</span></dt>
+<dd>Category numbers to be used for the fixations. All fixations are
+repeated for every category.</dd>
+<dt>subjectindices <span class="classifier-delimiter">:</span> <span class="classifier">list, default = [1]</span></dt>
+<dd>Subjectindices to be used for the fixations. Every subjectindex will show
+up for every category in the test fixmat.</dd>
+<dt>params <span class="classifier-delimiter">:</span> <span class="classifier">dictionary, optional</span></dt>
+<dd>A list of parameters that is set for the resulting fixmat. Defaults 
+are &#8216;image_size&#8217;:[922,1272] and &#8216;pxels_per_degree&#8217;:36</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="working-with-fixmats">
+<h2>Working with fixmats<a class="headerlink" href="#working-with-fixmats" title="Permalink to this headline">¶</a></h2>
+<p>Let&#8217;s go through the process step-by-step with a demo fixmat that is placed in
+<em>ocupy/tests/fixmat_demo.mat</em>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;../../ocupy/tests/fixmat_demo.mat&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">fm</span>
+<span class="go">Fixmat with 2092 fixations and the following data fields:</span>
+<span class="go">          Field Name |     Length    |    Type    |        Values</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">            category |      2092     |   int32    |        [7 8]</span>
+<span class="go">                 end |      2092     |   int32    |         Many</span>
+<span class="go">                 fix |      2092     |   uint8    |         Many</span>
+<span class="go">        SUBJECTINDEX |      2092     |   uint8    |         [36]</span>
+<span class="go">               start |      2092     |   int32    |         Many</span>
+<span class="go">            on_image |      2092     |   uint8    |        [0 1]</span>
+<span class="go">                   y |      2092     |  float32   |         Many</span>
+<span class="go">                   x |      2092     |  float32   |         Many</span>
+<span class="go">          filenumber |      2092     |   uint16   |         Many</span>
+<span class="go">           condition |      2092     |   uint8    |         [1]</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">      Parameter Name | Value</span>
+<span class="go">---------------------+---------------------------------------------</span>
+<span class="go">          image_size | [960, 1280]</span>
+<span class="go">   pixels_per_degree | 45</span>
+</pre></div>
+</div>
+<p>This loads the fixmat and prints a pretty table summarizing the contents of the
+fixmat. Please notice the distinction between <em>parameters</em> and <em>fields</em>. Both
+can be accessed by using the dot notation:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">10</span><span class="p">]</span>
+<span class="go">array([  945.12036133,   582.62030029,   559.28320312,   932.50823975,</span>
+<span class="go"> 965.1854248 ,   925.03417969,  1216.84509277,   810.5010376 ,</span>
+<span class="go"> 525.40301514], dtype=float32)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span><span class="o">.</span><span class="n">image_size</span>
+<span class="go">[960, 1280]</span>
+</pre></div>
+</div>
+<p>The next example shows how you would compute an FDM of the entire fixmat
+(a.k.a. the spatial bias).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="kn">import</span> <span class="nn">pylab</span> <span class="kn">as</span> <span class="nn">plot</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;../ocupy/tests/fixmat_demo.mat&#39;</span><span class="p">)</span>
+<span class="n">fdm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">compute_fdm</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span><span class="n">scale_factor</span><span class="o">=</span><span class="mf">0.25</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">fdm</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>[<a class="reference external" href="plot_directive/inline/e0de41fe35.hires.png">hires.png</a>, <a class="reference external" href="plot_directive/inline/e0de41fe35.pdf">pdf</a>]</p>
+<img alt="_images/e0de41fe35.png" src="_images/e0de41fe35.png" />
+<p>Most often only a subset of the data is of interest. The fixmat can be filtered by using square brackets:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">fm</span><span class="p">[</span><span class="n">fm</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="mi">7</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">fm</span>
+<span class="go">Fixmat with 932 fixations and the following data fields:</span>
+<span class="go">          Field Name |     Length    |    Type    |        Values</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">            category |      932      |   int32    |         [7]</span>
+<span class="go">                 end |      932      |   int32    |         Many</span>
+<span class="go">                 fix |      932      |   uint8    |         Many</span>
+<span class="go">        SUBJECTINDEX |      932      |   uint8    |         [36]</span>
+<span class="go">               start |      932      |   int32    |         Many</span>
+<span class="go">            on_image |      932      |   uint8    |        [0 1]</span>
+<span class="go">                   y |      932      |  float32   |         Many</span>
+<span class="go">                   x |      932      |  float32   |         Many</span>
+<span class="go">          filenumber |      932      |   uint16   |         Many</span>
+<span class="go">           condition |      932      |   uint8    |         [1]</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">      Parameter Name | Value</span>
+<span class="go">---------------------+---------------------------------------------</span>
+<span class="go">          image_size | [960, 1280]</span>
+<span class="go">   pixels_per_degree | 45</span>
+</pre></div>
+</div>
+<p>How does this work? The expression in the brackets is evaluated for every entry in
+the <em>fm.category</em> field. This results in a vector of booleans that has the same size
+as the <em>fm.category</em> field. Using the square brackets applies this logical index to all
+fields of the fixmat. Several logical expressions can be combined with logical operators.
+In contrast to matlab the <em>logical</em> operators have stronger binding than the <em>comparison</em>
+operators. Thus, <em>fm.category == 1 &amp; fm.SUBJECTINDEX == 2</em> will produce an error because
+will try to bind <em>1 &amp; fm.SUBJECTINDEX</em>. To filter correctly, you have to use parenthesis
+(see next example).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="kn">import</span> <span class="nn">pylab</span> <span class="kn">as</span> <span class="nn">plot</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;../ocupy/tests/fixmat_demo.mat&#39;</span><span class="p">)</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fm</span><span class="p">[(</span><span class="n">fm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="mi">7</span><span class="p">)]</span>
+<span class="n">fdm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">compute_fdm</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span><span class="n">scale_factor</span><span class="o">=</span><span class="mf">0.25</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">fdm</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>[<a class="reference external" href="plot_directive/inline/8018522b91.hires.png">hires.png</a>, <a class="reference external" href="plot_directive/inline/8018522b91.pdf">pdf</a>]</p>
+<img alt="_images/8018522b91.png" src="_images/8018522b91.png" />
+<p>In matlab we would traditionally use for loops over all unique values of a field
+to iterate over the field. In python this is easier, we can simply use the <tt class="xref py py-func docutils literal"><span class="pre">by_field()</span></tt>
+method:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">fm</span> <span class="o">=</span> <span class="n">TestFixmatFactory</span><span class="p">(</span><span class="n">categories</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">filenumbers</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">subjectindices</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="k">for</span> <span class="n">cat_mat</span> <span class="ow">in</span> <span class="n">fm</span><span class="o">.</span><span class="n">by_field</span><span class="p">(</span><span class="s">&#39;category&#39;</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">img_mat</span> <span class="ow">in</span> <span class="n">cat_mat</span><span class="o">.</span><span class="n">by_field</span><span class="p">(</span><span class="s">&#39;filenumber&#39;</span><span class="p">):</span>
+                        <span class="c"># The img_mat now contains all fixation data for one image</span>
+                        <span class="c"># in one cagegory</span>
+                        <span class="k">pass</span>
+</pre></div>
+</div>
+<p>There is a short-cut for iterating over categories and images (because it is so common):</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="kn">import</span> <span class="nn">pylab</span> <span class="kn">as</span> <span class="nn">plot</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;../ocupy/tests/fixmat_demo.mat&#39;</span><span class="p">)</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fm</span><span class="p">[(</span><span class="n">fm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">&gt;</span> <span class="mi">36</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">&lt;</span> <span class="mi">40</span><span class="p">)]</span>
+<span class="k">for</span> <span class="n">cat</span><span class="p">,(</span><span class="n">cat_mat</span><span class="p">,</span><span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">by_cat</span><span class="p">()):</span>
+        <span class="k">for</span> <span class="n">img</span><span class="p">,(</span><span class="n">img_mat</span><span class="p">,</span><span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cat_mat</span><span class="o">.</span><span class="n">by_filenumber</span><span class="p">()):</span>
+                <span class="n">fdm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">compute_fdm</span><span class="p">(</span><span class="n">img_mat</span><span class="p">,</span><span class="n">scale_factor</span><span class="o">=</span><span class="mf">0.25</span><span class="p">)</span>
+                <span class="n">plot</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="o">*</span><span class="n">cat</span><span class="p">)</span><span class="o">+</span><span class="n">img</span><span class="p">)</span>
+                <span class="n">plot</span><span class="o">.</span><span class="n">xticks</span><span class="p">([])</span>
+                <span class="n">plot</span><span class="o">.</span><span class="n">yticks</span><span class="p">([])</span>
+                <span class="n">plot</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">fdm</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>[<a class="reference external" href="plot_directive/inline/ade1b1ac02.hires.png">hires.png</a>, <a class="reference external" href="plot_directive/inline/ade1b1ac02.pdf">pdf</a>]</p>
+<img alt="_images/ade1b1ac02.png" src="_images/ade1b1ac02.png" />
+<p>There are some other usefull functions (<tt class="xref py py-func docutils literal"><span class="pre">add_field()</span></tt>, <tt class="xref py py-func docutils literal"><span class="pre">join()</span></tt>, <tt class="xref py py-func docutils literal"><span class="pre">parameters()</span></tt> and
+<tt class="xref py py-func docutils literal"><span class="pre">fieldnames()</span></tt>). See the following reference section for more details.</p>
+<dl class="class">
+<dt id="ocupy.fixmat.FixMat">
+<em class="property">class </em><tt class="descclassname">ocupy.fixmat.</tt><tt class="descname">FixMat</tt><big>(</big><em>categories=None</em>, <em>fixmat=None</em>, <em>index=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represents fixation data. 
+The fixmat object presents the fixation data as lists of values to the 
+user. In general fixation data consists of fixations that have several
+attributes. A fixation for example has a x and y position, but is also
+associated with the image that was being viewed while the fixation
+was made. The data can be accessed as attributes of the fixmat:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">fixmat</span><span class="o">.</span><span class="n">x</span>    <span class="c"># Returns a list of x-coordinates</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fixmat</span><span class="o">.</span><span class="n">y</span>    <span class="c"># Returns a list of y-coordinates</span>
+</pre></div>
+</div>
+<p>In this case a single index into anyone of these lists represents a 
+fixation:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="p">(</span><span class="n">fixmat</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">It is never neccessary to create a FixMat object directly. 
+This is handled by Fixmat factories.</p>
+</div>
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.add_feature_values">
+<tt class="descname">add_feature_values</tt><big>(</big><em>features</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.add_feature_values"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.add_feature_values" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds feature values of feature &#8216;feature&#8217; to all fixations in 
+the calling fixmat.</p>
+<p>For fixations out of the image boundaries, NaNs are returned.
+The function generates a new attribute field named with the
+string in features that contains an np.array listing feature
+values for every fixation in the fixmat.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The calling fixmat must have been constructed with an</p>
+</div>
+<p>stimuli.Categories object</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>features <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>list of feature names for which feature values are extracted.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.add_field">
+<tt class="descname">add_field</tt><big>(</big><em>name</em>, <em>data</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.add_field"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.add_field" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add a new field to the fixmat.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>name <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>Name of the new field</dd>
+<dt>data <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Data for the new field, must be same length as all other fields.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.by_cat">
+<tt class="descname">by_cat</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.by_cat"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.by_cat" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterates over categories and returns a filtered fixmat.</p>
+<p>If a categories object is attached, the images object for the given 
+category is returned as well (else None is returned).</p>
+<dl class="docutils">
+<dt>Returns:</dt>
+<dd><dl class="first last docutils">
+<dt>(fixmat, categories) <span class="classifier-delimiter">:</span> <span class="classifier">A tuple that contains first the filtered</span></dt>
+<dd>fixmat (has only one category) and second the associated 
+categories object (if it is available, None otherwise)</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.by_field">
+<tt class="descname">by_field</tt><big>(</big><em>field</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.by_field"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.by_field" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns an iterator that iterates over unique values of field</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>field <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>Filters the fixmat for every unique value in field and yields 
+the filtered fixmat.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd><dl class="first last docutils">
+<dt>fixmat <span class="classifier-delimiter">:</span> <span class="classifier">FixMat that is filtered according to one of the unique</span></dt>
+<dd>values in &#8216;field&#8217;.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.by_filenumber">
+<tt class="descname">by_filenumber</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.by_filenumber"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.by_filenumber" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterates over categories and returns a filtered fixmat.</p>
+<p>If a categories object is attached, the images object for the given 
+category is returned as well (else None is returned).</p>
+<dl class="docutils">
+<dt>Returns:</dt>
+<dd><dl class="first last docutils">
+<dt>(fixmat, categories) <span class="classifier-delimiter">:</span> <span class="classifier">A tuple that contains first the filtered</span></dt>
+<dd>fixmat (has only one category) and second the associated 
+categories object (if it is available, None otherwise)</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.fieldnames">
+<tt class="descname">fieldnames</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.fieldnames"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.fieldnames" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of data fields that are present in the fixmat.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.filter">
+<tt class="descname">filter</tt><big>(</big><em>index</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.filter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.filter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Filters a fixmat by different aspects.</p>
+<p>This function is a device to filter the fixmat by certain logical 
+conditions. It takes as input a logical array (contains only True
+or False for every fixation) and kicks out all fixations for which
+the array says False. The logical array can conveniently be created
+with numpy:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">category</span><span class="p">)</span>
+<span class="go">np.array([2,9])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm_filtered</span> <span class="o">=</span> <span class="n">fm</span><span class="p">[</span> <span class="n">fm</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="mi">9</span> <span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">fm_filtered</span><span class="p">)</span>
+<span class="go">np.array([9])</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>index <span class="classifier-delimiter">:</span> <span class="classifier">array</span></dt>
+<dd>Array-like that contains True for every fixtation that
+passes the filter; else contains False</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>fixmat : FixMat Instance</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.join">
+<tt class="descname">join</tt><big>(</big><em>fm_new</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.join"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.join" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds content of a new fixmat to this fixmat.</p>
+<p>If the two fixmats have different fields the minimal subset of both 
+are present after the join. Parameters of the fixmats must be the 
+same.</p>
+<p>Parameters
+fm_new : Instance of Fixmat</p>
+<blockquote>
+<div>This fixmat is added to the current one. Can only contain data
+from one subject.</div></blockquote>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="ocupy.fixmat.FixMat.load">
+<em class="property">static </em><tt class="descname">load</tt><big>(</big><em>path</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.load"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.load" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load fixmat at path.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>path <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>Absolute path of the file to load from.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.make_reg_data">
+<tt class="descname">make_reg_data</tt><big>(</big><em>feature_list=None</em>, <em>all_controls=False</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.make_reg_data"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.make_reg_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates two M x N matrices with M feature values at fixations for 
+N features. Controls are a random sample out of all non-fixated regions 
+of an image or fixations of the same subject group on a randomly chosen 
+image. Fixations are pooled over all subjects in the calling fixmat.</p>
+<dl class="docutils">
+<dt>Parameters <span class="classifier-delimiter">:</span> <span class="classifier"></span></dt>
+<dd><dl class="first last docutils">
+<dt>all_controls <span class="classifier-delimiter">:</span> <span class="classifier">bool</span></dt>
+<dd>if True, all non-fixated points on a feature map are takes as
+control values. If False, controls are fixations from the same
+subjects but on one other randomly chosen image of the same
+category</dd>
+<dt>feature_list <span class="classifier-delimiter">:</span> <span class="classifier">list of strings</span></dt>
+<dd>contains names of all features that are used to generate
+the feature value matrix (&#8211;&gt; number of dimensions in the 
+model). 
+...note: this list has to be sorted !</dd>
+</dl>
+</dd>
+<dt>Returns <span class="classifier-delimiter">:</span> <span class="classifier"></span></dt>
+<dd>N x M matrix of N control feature values per feature (M).
+Rows = Feature number /type
+Columns = Feature values</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.parameters">
+<tt class="descname">parameters</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.parameters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.parameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a list of parameters that are available.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.rm_field">
+<tt class="descname">rm_field</tt><big>(</big><em>name</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.rm_field"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.rm_field" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove a field from the fixmat.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>name <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>Name of the field to be removed</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.fixmat.FixMat.save">
+<tt class="descname">save</tt><big>(</big><em>path</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#FixMat.save"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.FixMat.save" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves fixmat to path.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>path <span class="classifier-delimiter">:</span> <span class="classifier">string   </span></dt>
+<dd>Absolute path of the file to save to.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="computing-a-fixation-density-map">
+<h2>Computing a fixation density map<a class="headerlink" href="#computing-a-fixation-density-map" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="kn">import</span> <span class="nn">pylab</span> <span class="kn">as</span> <span class="nn">plot</span>
+<span class="n">points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span><span class="mi">100</span><span class="p">))</span><span class="o">*</span><span class="mi">500</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">TestFixmatFactory</span><span class="p">(</span><span class="n">points</span> <span class="o">=</span> <span class="n">points</span><span class="p">,</span> <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;image_size&#39;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">500</span><span class="p">]})</span>
+<span class="n">fdm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">compute_fdm</span><span class="p">(</span><span class="n">fm</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">fdm</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>[<a class="reference external" href="plot_directive/inline/76f909efd8.hires.png">hires.png</a>, <a class="reference external" href="plot_directive/inline/76f909efd8.pdf">pdf</a>]</p>
+<img alt="_images/76f909efd8.png" src="_images/76f909efd8.png" />
+<dl class="function">
+<dt id="ocupy.fixmat.compute_fdm">
+<tt class="descclassname">ocupy.fixmat.</tt><tt class="descname">compute_fdm</tt><big>(</big><em>fixmat</em>, <em>fwhm=2</em>, <em>scale_factor=1</em><big>)</big><a class="reference internal" href="_modules/ocupy/fixmat.html#compute_fdm"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.fixmat.compute_fdm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes a fixation density map for the calling fixmat.</p>
+<p>Creates a map the size of the image fixations were recorded on.  
+Every pixel contains the frequency of fixations
+for this image. The fixation map is smoothed by convolution with a
+Gaussian kernel to approximate the area with highest processing
+(usually 2 deg. visual angle).</p>
+<p>Note: The function does not check whether the fixmat contains
+fixations from different images as it might be desirable to compute
+fdms over fixations from more than one image.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>fwhm <span class="classifier-delimiter">:</span> <span class="classifier">float </span></dt>
+<dd>the full width at half maximum of the Gaussian kernel used
+for convolution of the fixation frequency map.</dd>
+<dt>scale_factor <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>scale factor for the resulting fdm. Default is 1. Scale_factor
+must be a float specifying the fraction of the current size.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd><dl class="first last docutils">
+<dt>fdm <span class="classifier-delimiter">:</span> <span class="classifier">numpy.array </span></dt>
+<dd>a numpy.array of size fixmat.image_size containing
+the fixation probability for every location on the image.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/logo.png" alt="Logo"/>
+            </a></p>
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">FixMat</a><ul>
+<li><a class="reference internal" href="#generating-a-fixmat">Generating a fixmat</a><ul>
+<li><a class="reference internal" href="#using-the-fixmatfactory">Using the FixmatFactory</a></li>
+<li><a class="reference internal" href="#using-the-directoryfixmatfactory">Using the DirectoryFixmatFactory</a></li>
+<li><a class="reference internal" href="#using-the-testfixmatfactory">Using the TestFixmatFactory</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#working-with-fixmats">Working with fixmats</a></li>
+<li><a class="reference internal" href="#computing-a-fixation-density-map">Computing a fixation density map</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">Welcome to ocupy&#8217;s documentation!</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="parallel.html"
+                        title="next chapter">Parallel</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/fixmat.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="parallel.html" title="Parallel"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to ocupy’s documentation!"
+             >previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, WhiteMatter Labs GmbH.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>

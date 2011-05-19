@@ -1,0 +1,245 @@
+FixMat
+======
+
+.. module:: ocupy.fixmat
+
+This module wraps access to fixation data into a convenient data structure: a fixmat.
+A fixmat represents the data recorded with an eye-tracker. That is, it provides acces to
+all fixation events and their associated meta data. A fixation event describes a fixation
+made by a subject (it is automatically detected by the eye-tracker). Such an event is 
+defined by the fixation position on screen (x,y) and its start and end time. To be useful, 
+it is also necessary to record other metadata like the image the fixation was made on,
+the subject that made the fixations, and so forth. 
+
+A fixmat is an object that groups this information and provides a rather convenient
+interface for accessing the information. It is heavily inspired by the matlab structures
+that most people seem to be using in the lab. The fixmat module is very similar in the 
+way how the data is accessed. 
+
+Currently fixmats can only be created from existing matlab fixmat structures. There
+is not yet a python script that invokes edfread directly and parses it's output into
+the corresponding python structure. Also, to maintain compatibility it is recommended
+to save python fixmats as matlab structures that can be used by people which are still
+stuck with matlab.
+
+This document describes the most important properties of fixmats in three steps. 
+First, it explains how fixmats can be created from existing data, second it shows 
+some typical examples of how the fixmat can be used and third it shows how a fixation 
+density map can be computed.
+ 
+
+
+Generating a fixmat
+-------------------
+.. Note::  Currently fixmats can not be created 
+    from raw EDF files by just using python. This means, you have to use
+    matlab and edfread to convert the raw data into a matlab fixmat. 
+
+There are three ways to create a fixmat:
+    1. Load a single matlab fixmat file from disk (fixmat.FixmatFactory)
+    2. Concatenate all fixmats in a directory (fixmat.DirectoryFixmatFactory
+    3. Create a fixmat for testing purposes (fixmat.TestFactory)
+
+Using the FixmatFactory
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The fixmat factory loads a single existing matlab fixmat and returns a 
+python fixmat object.
+        
+	>>> from ocupy.fixmat import FixmatFactory
+	>>> fm = FixmatFactory('../ocupy/tests/fixmat_demo.mat')
+
+.. autofunction:: FixmatFactory
+
+Using the DirectoryFixmatFactory
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The DirectoryFixmatFactory loads all \*.mat files in a directory (assuming
+they're fixmats) and concatenates these into on big fixmat.
+
+	>>> from ocupy.fixmat import DirectoryFixmatFactory
+	>>> fm = FixmatFactory('demo/')
+
+.. autofunction:: DirectoryFixmatFactory
+
+Using the TestFixmatFactory
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Fixmats created with the TestFixmatFactory can be used to write automated 
+tests that require some fixation data. What data goes into the fixmat can 
+be controlled by different parameters in the constructor.
+
+.. doctest:: 
+
+	>>> from ocupy.fixmat import TestFixmatFactory
+	>>> fm = TestFixmatFactory(categories = [1, 2, 3], filenumbers = [1, 2, 3], subjectindices = [1, 2, 3])
+	>>> print fm
+	Fixmat with 24894 fixations and the following data fields:
+	          Field Name |     Length    |    Type    |        Values        
+	---------------------+---------------+------------+----------------
+	                   x |     24894     |  float64   |         Many         
+	                   y |     24894     |  float64   |         Many         
+	        SUBJECTINDEX |     24894     |  float64   |    [ 1.  2.  3.]     
+	          filenumber |     24894     |  float64   |    [ 1.  2.  3.]     
+	            category |     24894     |  float64   |    [ 1.  2.  3.]     
+	---------------------+---------------+------------+----------------
+	      Parameter Name | Value               
+	---------------------+---------------------------------------------
+	   pixels_per_degree | 36 
+	          image_size | [922, 1272] 
+
+	
+.. autofunction:: TestFixmatFactory
+
+Working with fixmats
+--------------------
+
+Let's go through the process step-by-step with a demo fixmat that is placed in 
+*ocupy/tests/fixmat_demo.mat*::
+
+	>>> from ocupy import fixmat 
+	>>> fm = fixmat.FixmatFactory('../../ocupy/tests/fixmat_demo.mat')
+	>>> print fm
+	Fixmat with 2092 fixations and the following data fields:
+	          Field Name |     Length    |    Type    |        Values        
+	---------------------+---------------+------------+----------------
+	            category |      2092     |   int32    |        [7 8]         
+	                 end |      2092     |   int32    |         Many         
+	                 fix |      2092     |   uint8    |         Many         
+	        SUBJECTINDEX |      2092     |   uint8    |         [36]         
+	               start |      2092     |   int32    |         Many         
+	            on_image |      2092     |   uint8    |        [0 1]         
+	                   y |      2092     |  float32   |         Many         
+	                   x |      2092     |  float32   |         Many         
+	          filenumber |      2092     |   uint16   |         Many         
+	           condition |      2092     |   uint8    |         [1]          
+	---------------------+---------------+------------+----------------
+	      Parameter Name | Value               
+	---------------------+---------------------------------------------
+	          image_size | [960, 1280] 
+	   pixels_per_degree | 45 
+
+This loads the fixmat and prints a pretty table summarizing the contents of the
+fixmat. Please notice the distinction between *parameters* and *fields*. Both
+can be accessed by using the dot notation::
+
+	>>> fm.x[1:10]
+	array([  945.12036133,   582.62030029,   559.28320312,   932.50823975,
+         965.1854248 ,   925.03417969,  1216.84509277,   810.5010376 ,
+         525.40301514], dtype=float32)
+	>>> fm.image_size
+	[960, 1280]
+ 
+The next example shows how you would compute an FDM of the entire fixmat
+(a.k.a. the spatial bias). 
+
+.. plot::
+	:include-source:
+	
+	import numpy as np
+	from ocupy import fixmat
+	import pylab as plot
+	fm = fixmat.FixmatFactory('../ocupy/tests/fixmat_demo.mat')
+	fdm = fixmat.compute_fdm(fm,scale_factor=0.25)
+	plot.imshow(fdm)
+	plot.show()
+	
+Most often only a subset of the data is of interest. The fixmat can be filtered by using square brackets:
+
+	>>> fm = fm[fm.category == 7]
+	>>> print fm
+	Fixmat with 932 fixations and the following data fields:
+	          Field Name |     Length    |    Type    |        Values        
+	---------------------+---------------+------------+----------------
+	            category |      932      |   int32    |         [7]          
+	                 end |      932      |   int32    |         Many         
+	                 fix |      932      |   uint8    |         Many         
+	        SUBJECTINDEX |      932      |   uint8    |         [36]         
+	               start |      932      |   int32    |         Many         
+	            on_image |      932      |   uint8    |        [0 1]         
+	                   y |      932      |  float32   |         Many         
+	                   x |      932      |  float32   |         Many         
+	          filenumber |      932      |   uint16   |         Many         
+	           condition |      932      |   uint8    |         [1]          
+	---------------------+---------------+------------+----------------
+	      Parameter Name | Value               
+	---------------------+---------------------------------------------
+	          image_size | [960, 1280] 
+	   pixels_per_degree | 45 
+
+
+How does this work? The expression in the brackets is evaluated for every entry in
+the *fm.category* field. This results in a vector of booleans that has the same size
+as the *fm.category* field. Using the square brackets applies this logical index to all
+fields of the fixmat. Several logical expressions can be combined with logical operators.
+In contrast to matlab the *logical* operators have stronger binding than the *comparison* 
+operators. Thus, *fm.category == 1 & fm.SUBJECTINDEX == 2* will produce an error because
+will try to bind *1 & fm.SUBJECTINDEX*. To filter correctly, you have to use parenthesis 
+(see next example).
+
+.. plot::
+	:include-source:
+	
+	import numpy as np
+	from ocupy import fixmat
+	import pylab as plot
+	fm = fixmat.FixmatFactory('../ocupy/tests/fixmat_demo.mat')
+	fm = fm[(fm.filenumber == 1) & (fm.category == 7)]
+	fdm = fixmat.compute_fdm(fm,scale_factor=0.25)
+	plot.imshow(fdm)
+	plot.show()
+
+In matlab we would traditionally use for loops over all unique values of a field
+to iterate over the field. In python this is easier, we can simply use the :func:`by_field`
+method::
+	
+	fm = TestFixmatFactory(categories = [1, 2, 3], filenumbers = [1, 2, 3], subjectindices = [1, 2, 3])
+	for cat_mat in fm.by_field('category'):
+			for img_mat in cat_mat.by_field('filenumber'):
+				# The img_mat now contains all fixation data for one image
+				# in one cagegory
+				pass
+				
+There is a short-cut for iterating over categories and images (because it is so common):
+				
+.. plot::
+	:include-source:
+	
+	import numpy as np
+	from ocupy import fixmat
+	import pylab as plot
+	fm = fixmat.FixmatFactory('../ocupy/tests/fixmat_demo.mat')
+	fm = fm[(fm.filenumber > 36) & (fm.filenumber < 40)]
+	for cat,(cat_mat,_) in enumerate(fm.by_cat()):
+		for img,(img_mat,_) in enumerate(cat_mat.by_filenumber()):
+			fdm = fixmat.compute_fdm(img_mat,scale_factor=0.25)
+			plot.subplot(2,3, (3*cat)+img)
+			plot.xticks([])
+			plot.yticks([]) 
+			plot.imshow(fdm)
+	plot.show()
+
+There are some other usefull functions (:func:`add_field`, :func:`join`, :func:`parameters` and
+:func:`fieldnames`). See the following reference section for more details.
+
+
+.. autoclass:: FixMat
+    :members:
+
+Computing a fixation density map
+---------------------------------
+
+
+.. plot::
+   	:include-source:
+
+	import numpy as np
+	from ocupy import fixmat
+	import pylab as plot
+	points = np.random.random((2,100))*500
+	fm = fixmat.TestFixmatFactory(points = points, params = {'image_size' : [500,500]})
+	fdm = fixmat.compute_fdm(fm)
+	plot.imshow(fdm)
+	plot.show()
+.. autofunction:: compute_fdm
+

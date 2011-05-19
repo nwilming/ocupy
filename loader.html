@@ -1,0 +1,357 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Loader &mdash; ocupy v0.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="ocupy v0.1 documentation" href="index.html" />
+    <link rel="next" title="Measures" href="measures.html" />
+    <link rel="prev" title="Organization of stimuli: categories, images and features" href="stimuli.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="measures.html" title="Measures"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="stimuli.html" title="Organization of stimuli: categories, images and features"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-ocupy.loader">
+<span id="loader"></span><h1>Loader<a class="headerlink" href="#module-ocupy.loader" title="Permalink to this headline">¶</a></h1>
+<p>This module abstracts access to stimuli from physical access to it.</p>
+<dl class="class">
+<dt id="ocupy.loader.LoadFromDisk">
+<em class="property">class </em><tt class="descclassname">ocupy.loader.</tt><tt class="descname">LoadFromDisk</tt><big>(</big><em>impath=None</em>, <em>ftrpath=None</em>, <em>size=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk" title="Permalink to this definition">¶</a></dt>
+<dd><p>A loader implementation that loads images and features 
+from the hard disk. Resizes images and features to a common 
+size if needed.</p>
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.get_feature">
+<tt class="descname">get_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>feature</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.get_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.get_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load a feature from disk.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.get_image">
+<tt class="descname">get_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.get_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.get_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads an image from disk.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.path">
+<tt class="descname">path</tt><big>(</big><em>category=None</em>, <em>image=None</em>, <em>feature=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.path"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.path" title="Permalink to this definition">¶</a></dt>
+<dd><blockquote>
+<div>Constructs the path to categories, images and features.</div></blockquote>
+<p>This path function assumes that the following storage scheme is used on
+the hard disk to access categories, images and features:</p>
+<blockquote>
+<div><ul class="simple">
+<li>categories: /impath/category</li>
+<li>images:     /impath/category/category_image.png</li>
+<li>features:   /ftrpath/category/feature/category_image.mat</li>
+</ul>
+</div></blockquote>
+<p>The path function is called to query the location of categories, images
+and features before they are loaded. Thus, if your features are organized 
+in a different way, you can simply replace this method such that it returns
+appropriate paths&#8217; and the LoadFromDisk loader will use your naming
+scheme.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.test_for_category">
+<tt class="descname">test_for_category</tt><big>(</big><em>cat</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.test_for_category"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.test_for_category" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if category cat exists.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.test_for_feature">
+<tt class="descname">test_for_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>ftr</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.test_for_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.test_for_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if feature ftr exists for image img in category cat</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.test_for_image">
+<tt class="descname">test_for_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.test_for_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.test_for_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if image img in category cat exists</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ocupy.loader.Loader">
+<em class="property">class </em><tt class="descclassname">ocupy.loader.</tt><tt class="descname">Loader</tt><big>(</big><em>impath=None</em>, <em>ftrpath=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represents an interface that encapsulates physical access to 
+images and features.</p>
+<dl class="method">
+<dt id="ocupy.loader.Loader.get_feature">
+<tt class="descname">get_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>feature</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.get_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.get_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the feature indexed by (cat,img,feature) as numpy matrix.</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string with str()</dt>
+<dd>The category of the image for which the feature should be
+loaded.</dd>
+<dt>img: Convertible to string with str()</dt>
+<dd>The image to which the feature belongs.</dd>
+<dt>feature: string.</dt>
+<dd>Name of the feature.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>numpy.ndarray: The feature as a numpy matrix.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.get_image">
+<tt class="descname">get_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.get_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.get_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the image indexed by (cat,img) as numpy matrix.</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: convertible to string with str().</dt>
+<dd>The category of the image that needs to be loaded.</dd>
+<dt>img: convertible to string with str()</dt>
+<dd>The image that needs to be loaded.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>numpy.ndarray: The image in matrix form.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.path">
+<tt class="descname">path</tt><big>(</big><em>*args</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.path"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.path" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constructs path or URL to cat/img/ftr from <a href="#id1"><span class="problematic" id="id2">*</span></a>args</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.save_feature">
+<tt class="descname">save_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>feature</em>, <em>data</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.save_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.save_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the feature that is indexed by (cat, img, feature) [optional].</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string with str()</dt>
+<dd>The category of the image of the feature that needs to be saved.</dd>
+<dt>img: Convertible to string with str()</dt>
+<dd>The image identifier of the feature to be saved.</dd>
+<dt>data: numpy.ndarray.</dt>
+<dd>Feature in matrix form.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.save_image">
+<tt class="descname">save_image</tt><big>(</big><em>cat</em>, <em>img</em>, <em>data</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.save_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.save_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the image that is indexed by (cat, img) [optional].</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string with str()</dt>
+<dd>The category of the image that needs to be saved.</dd>
+<dt>img: Convertible to string with str()</dt>
+<dd>The image identifier of the image to be saved.</dd>
+<dt>data: numpy.ndarray.</dt>
+<dd>Image in matrix form.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.test_for_category">
+<tt class="descname">test_for_category</tt><big>(</big><em>cat</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.test_for_category"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.test_for_category" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if category cat exists.</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string via str()</dt>
+<dd>The category to test for.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>boolean: True if the category exists and False otherwise.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.test_for_feature">
+<tt class="descname">test_for_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>ftr</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.test_for_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.test_for_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if feature ftr exists for image img in category cat.</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string via str()</dt>
+<dd>The category to test for.</dd>
+<dt>img: Convertible to string via str()</dt>
+<dd>The image to test for</dd>
+<dt>feature: string</dt>
+<dd>Feature to test for.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>boolean: True if the feature exist and False otherwise.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.test_for_image">
+<tt class="descname">test_for_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.test_for_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.test_for_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if image img in category cat exists</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string via str()</dt>
+<dd>The category to test for.</dd>
+<dt>img: Convertible to string via str()</dt>
+<dd>The image to test for</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>boolean: True if the image exists in the category and False otherwise.</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ocupy.loader.SaveToDisk">
+<em class="property">class </em><tt class="descclassname">ocupy.loader.</tt><tt class="descname">SaveToDisk</tt><big>(</big><em>impath=None</em>, <em>ftrpath=None</em>, <em>size=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#SaveToDisk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.SaveToDisk" title="Permalink to this definition">¶</a></dt>
+<dd><p>A loader that adds functionality to save images or features.</p>
+<dl class="method">
+<dt id="ocupy.loader.SaveToDisk.save_feature">
+<tt class="descname">save_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>feature</em>, <em>data</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#SaveToDisk.save_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.SaveToDisk.save_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves a new feature.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.SaveToDisk.save_image">
+<tt class="descname">save_image</tt><big>(</big><em>cat</em>, <em>img</em>, <em>data</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#SaveToDisk.save_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.SaveToDisk.save_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves a new image.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ocupy.loader.TestLoader">
+<em class="property">class </em><tt class="descclassname">ocupy.loader.</tt><tt class="descname">TestLoader</tt><big>(</big><em>img_per_cat=None</em>, <em>features=None</em>, <em>size=(10</em>, <em>10)</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#TestLoader"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.TestLoader" title="Permalink to this definition">¶</a></dt>
+<dd><p>A loader used for testing the stimuli.* class. Simply 
+returns (cat, img) or (cat,img,feature).</p>
+<dl class="method">
+<dt id="ocupy.loader.TestLoader.test_for_category">
+<tt class="descname">test_for_category</tt><big>(</big><em>cat</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#TestLoader.test_for_category"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.TestLoader.test_for_category" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if category cat exists.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.TestLoader.test_for_image">
+<tt class="descname">test_for_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#TestLoader.test_for_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.TestLoader.test_for_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if image img in category cat exists</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/logo.png" alt="Logo"/>
+            </a></p>
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="stimuli.html"
+                        title="previous chapter">Organization of stimuli: categories, images and features</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="measures.html"
+                        title="next chapter">Measures</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/loader.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="measures.html" title="Measures"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="stimuli.html" title="Organization of stimuli: categories, images and features"
+             >previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, WhiteMatter Labs GmbH.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>

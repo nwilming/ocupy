@@ -1,0 +1,328 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Measures &mdash; ocupy v0.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="ocupy v0.1 documentation" href="index.html" />
+    <link rel="prev" title="Loader" href="loader.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="loader.html" title="Loader"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-ocupy.measures">
+<span id="measures"></span><h1>Measures<a class="headerlink" href="#module-ocupy.measures" title="Permalink to this headline">¶</a></h1>
+<p>This module implements different model evaluation measures.</p>
+<dl class="function">
+<dt id="ocupy.measures.chao_shen">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">chao_shen</tt><big>(</big><em>q</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#chao_shen"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.chao_shen" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes some terms needed for the Chao-Shen KL correction.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.correlation_model">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">correlation_model</tt><big>(</big><em>prediction</em>, <em>fm</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#correlation_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.correlation_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>wraps numpy.corrcoef functionality for model evaluation</p>
+<dl class="docutils">
+<dt>input:</dt>
+<dd><dl class="first last docutils">
+<dt>prediction: 2D Matrix </dt>
+<dd>the model salience map</dd>
+<dt>fm: fixmat </dt>
+<dd>Used to compute a FDM to which the prediction is compared.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.emd">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">emd</tt><big>(</big><em>prediction</em>, <em>ground_truth</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#emd"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.emd" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the Eart Movers Distance between prediction and model.</p>
+<p>This implementation uses opencv for doing the actual work.
+Unfortunately, at the time of implementation only the SWIG
+bindings werer available and the numpy arrays have to
+converted by hand. This changes with opencv 2.1.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.emd_model">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">emd_model</tt><big>(</big><em>prediction</em>, <em>fm</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#emd_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.emd_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>wraps emd functionality for model evaluation</p>
+<dl class="docutils">
+<dt>requires:</dt>
+<dd>OpenCV python bindings</dd>
+<dt>input:</dt>
+<dd>prediction: the model salience map
+fm : fixmat filtered for the image corresponding to the prediction</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.exact_roc">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">exact_roc</tt><big>(</big><em>actuals</em>, <em>controls</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#exact_roc"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.exact_roc" title="Permalink to this definition">¶</a></dt>
+<dd><p>computes the area under the roc curve for separating to sets. Uses all
+possibl thresholds and trapezoidal interpolation. Also returns arrays of
+the true positive rate and the false positive rate.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.fast_roc">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">fast_roc</tt><big>(</big><em>actuals</em>, <em>controls</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#fast_roc"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.fast_roc" title="Permalink to this definition">¶</a></dt>
+<dd><p>approximates the area under the roc curve for sets of actuals and controls.
+Uses all values appearing in actuals as thresholds and lower sum 
+interpolation. Also returns arrays of the true positive rate and the false
+positive rate that can be used for plotting the roc curve.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>actuals <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>A list of numeric values for positive observations.</dd>
+<dt>controls <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>A list of numeric values for negative observations.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.funky_test_measure">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">funky_test_measure</tt><big>(</big><em>prediction</em>, <em>fm</em>, <em>arg1='bar'</em>, <em>arg2='foo'</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#funky_test_measure"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.funky_test_measure" title="Permalink to this definition">¶</a></dt>
+<dd><p>Measure that can be used for testing</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.kldiv">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">kldiv</tt><big>(</big><em>p</em>, <em>q</em>, <em>distp=None</em>, <em>distq=None</em>, <em>scale_factor=1</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#kldiv"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.kldiv" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes the Kullback-Leibler divergence between two distributions.</p>
+<dl class="docutils">
+<dt>Parameters</dt>
+<dd><dl class="first last docutils">
+<dt>p <span class="classifier-delimiter">:</span> <span class="classifier">Matrix</span></dt>
+<dd>The first probability distribution</dd>
+<dt>q <span class="classifier-delimiter">:</span> <span class="classifier">Matrix</span></dt>
+<dd>The second probability distribution</dd>
+<dt>distp <span class="classifier-delimiter">:</span> <span class="classifier">fixmat</span></dt>
+<dd>If p is None, distp is used to compute a FDM which 
+is then taken as 1st probability distribution.</dd>
+<dt>distq <span class="classifier-delimiter">:</span> <span class="classifier">fixmat</span></dt>
+<dd>If q is None, distq is used to compute a FDM which is 
+then taken as 2dn probability distribution.</dd>
+<dt>scale_factor <span class="classifier-delimiter">:</span> <span class="classifier">double</span></dt>
+<dd>Determines the size of FDM computed from distq or distp.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.kldiv_cs_model">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">kldiv_cs_model</tt><big>(</big><em>prediction</em>, <em>fm</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#kldiv_cs_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.kldiv_cs_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes Chao-Shen corrected KL-divergence between prediction 
+and fdm made from fixations in fm.</p>
+<dl class="docutils">
+<dt>Parameters :</dt>
+<dd><dl class="first docutils">
+<dt>prediction <span class="classifier-delimiter">:</span> <span class="classifier">np.ndarray</span></dt>
+<dd>a fixation density map</dd>
+</dl>
+<p class="last">fm : FixMat object</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.kldiv_model">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">kldiv_model</tt><big>(</big><em>prediction</em>, <em>fm</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#kldiv_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.kldiv_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>wraps kldiv functionality for model evaluation</p>
+<dl class="docutils">
+<dt>input:</dt>
+<dd><dl class="first last docutils">
+<dt>prediction: 2D matrix </dt>
+<dd>the model salience map</dd>
+<dt>fm <span class="classifier-delimiter">:</span> <span class="classifier">fixmat </span></dt>
+<dd>Should be filtered for the image corresponding to the prediction</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.nss">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">nss</tt><big>(</big><em>prediction</em>, <em>fix</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#nss"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.nss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the normalized scanpath salience</p>
+<dl class="docutils">
+<dt>input:</dt>
+<dd>fix : list, l[0] contains y, l[1] contains x</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.nss_model">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">nss_model</tt><big>(</big><em>prediction</em>, <em>fm</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#nss_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.nss_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>wraps nss functionality for model evaluation</p>
+<dl class="docutils">
+<dt>input:</dt>
+<dd><dl class="first last docutils">
+<dt>prediction: 2D matrix</dt>
+<dd>the model salience map</dd>
+<dt>fm <span class="classifier-delimiter">:</span> <span class="classifier">fixmat</span></dt>
+<dd>Fixations that define the actuals</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.prediction_scores">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">prediction_scores</tt><big>(</big><em>prediction</em>, <em>fm</em>, <em>**kw</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#prediction_scores"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.prediction_scores" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluates a prediction against fixations in a fixmat with different measures.</p>
+<p>The default measures which are used are AUC, NSS and KL-divergence. This 
+can be changed by setting the list of measures with set_scores.  
+As different measures need potentially different parameters, the kw
+dictionary can be used to pass arguments to measures. Every named 
+argument (except fm and prediction) of a measure that is included in 
+kw.keys() will be filled with the value stored in kw.
+Example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">prediction_scores</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">FM</span><span class="p">,</span> <span class="n">ctr_loc</span> <span class="o">=</span> <span class="p">(</span><span class="n">y</span><span class="p">,</span><span class="n">x</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>In this case the AUC will be computed with control points (y,x), because
+the measure &#8216;roc_model&#8217; has &#8216;ctr_loc&#8217; as named argument.</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>prediction <span class="classifier-delimiter">:</span> <span class="classifier">2D numpy array</span></dt>
+<dd>The prediction that should be evaluated</dd>
+<dt>fm <span class="classifier-delimiter">:</span> <span class="classifier">Fixmat</span></dt>
+<dd>The eyetracking data to evaluate against</dd>
+</dl>
+</dd>
+<dt>Output:</dt>
+<dd>Tuple of prediction scores. The order of the scores is determined
+by order of measures.scores.</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.roc_model">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">roc_model</tt><big>(</big><em>prediction</em>, <em>fm</em>, <em>ctr_loc=None</em>, <em>ctr_size=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#roc_model"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.roc_model" title="Permalink to this definition">¶</a></dt>
+<dd><p>wraps roc functionality for model evaluation</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>prediction: 2D array</dt>
+<dd>the model salience map</dd>
+<dt>fm <span class="classifier-delimiter">:</span> <span class="classifier">fixmat</span></dt>
+<dd>Fixations that define locations of the actuals</dd>
+<dt>ctr_loc <span class="classifier-delimiter">:</span> <span class="classifier">tuple of (y.x) coordinates, optional</span></dt>
+<dd>Allows to specify control points for spatial 
+bias correction</dd>
+<dt>ctr_size <span class="classifier-delimiter">:</span> <span class="classifier">two element tuple, optional</span></dt>
+<dd>Specifies the assumed image size of the control locations,
+defaults to fm.image_size</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.measures.set_scores">
+<tt class="descclassname">ocupy.measures.</tt><tt class="descname">set_scores</tt><big>(</big><em>score_list</em><big>)</big><a class="reference internal" href="_modules/ocupy/measures.html#set_scores"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.measures.set_scores" title="Permalink to this definition">¶</a></dt>
+<dd><p>Changes list of measures that are used by prediction_scores.</p>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/logo.png" alt="Logo"/>
+            </a></p>
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="loader.html"
+                        title="previous chapter">Loader</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/measures.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="loader.html" title="Loader"
+             >previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, WhiteMatter Labs GmbH.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
