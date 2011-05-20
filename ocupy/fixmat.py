@@ -671,3 +671,15 @@ def TestFixmatFactory(points = None, categories = [1],
     fixmat._num_fix  = len(fixmat.x)
     return fixmat
 
+def VectorFixmatFactory(fields, parameters, categories = None):
+    fm = FixMat(categories = categories)
+    fm._fields = fields.keys()
+    for (field, value) in fields.iteritems(): 
+       fm.__dict__[field] = value.reshape(-1,) 
+
+    fm._parameters = parameters
+    fm._subjects = None
+    for (field, value) in parameters.iteritems(): 
+       fm.__dict__[field] = value
+    fm._num_fix = len(fm.x)
+    return fm
