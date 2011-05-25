@@ -68,16 +68,19 @@ class FixMat(object):
     
     def __str__(self):
         desc = "Fixmat with %i fixations and the following data fields:\n" % (
-                                                                    len(self.x))
+                                                                    self._num_fix)
         desc += "%s | %s | %s | %s \n" % ('Field Name'.rjust(20),
                                           'Length'.center(13), 
                                           'Type'.center(10), 
                                           'Values'.center(20))
         desc += "---------------------+---------------+------------+----------------\n"
         for field in self._fields:
-            num_uniques = np.unique(self.__dict__[field])
-            if len(num_uniques) > 5:
-                num_uniques = 'Many'
+            if not self.__dict__[field].dtype == np.object:
+                num_uniques = np.unique(self.__dict__[field])
+                if len(num_uniques) > 5:
+                    num_uniques = 'Many'
+            else:
+                num_uniques = 'N/A'
             desc += "%s | %s | %s | %s \n" % (field.rjust(20), 
                                     str(len(self.__dict__[field])).center(13),
                                     str(self.__dict__[field].dtype).center(10),
@@ -330,7 +333,10 @@ class FixMat(object):
             features : string
                 list of feature names for which feature values are extracted.
         """
-        
+        if not 'x' in self._fieldnames:
+            raise RuntimeError("""add_feature_values expects to find
+        (x,y) locations in self.x and self.y. But self.x does not exist""")
+ 
         if not self._categories:
             raise RuntimeError(
             '''"%s" does not exist as a fieldname and the
@@ -377,6 +383,10 @@ class FixMat(object):
             Rows = Feature number /type
             Columns = Feature values
         """
+        if not 'x' in self._fieldnames:
+            raise RuntimeError("""make_reg_data expects to find
+        (x,y) locations in self.x and self.y. But self.x does not exist""")
+
         if (self.x < 2 * self.pixels_per_degree).any():
             warn('There are fixations within 2deg visual ' +
             'angle of the image border')
@@ -467,7 +477,7 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
     if len(fixmat.x) == 0:
         raise NoFixations('There are no fixations in the fixmat.')
 
-    assert not scale_factor <= 0, "scale_factor has to > 0"
+    assert not scale_factor <= 0, "scale_factor has to be > 0"
     # this specifies left edges of the histogram bins, i.e. fixations between
     # ]0 binedge[0]] are included. --> fixations are ceiled
     e_y = np.arange(0, np.round(scale_factor*fixmat.image_size[0]+1))
@@ -675,11 +685,10 @@ def VectorFixmatFactory(fields, parameters, categories = None):
     fm = FixMat(categories = categories)
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
-       fm.__dict__[field] = value.reshape(-1,) 
-
+        fm.__dict__[field] = value 
     fm._parameters = parameters
     fm._subjects = None
     for (field, value) in parameters.iteritems(): 
        fm.__dict__[field] = value
-    fm._num_fix = len(fm.x)
+    fm._num_fix = len(fm.__dict__[fields.keys()[0]])
     return fm
