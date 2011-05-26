@@ -202,7 +202,7 @@ class LoadFromDisk(Loader):
             data = loadmat(filename)['output']
         else:
             data = imread(filename)
-        if self.size:
+        if self.size is not None:
             return imresize(data, self.size)
         else:
             return data
@@ -214,7 +214,7 @@ class LoadFromDisk(Loader):
         filename = self.path(cat, img, feature)
         data = loadmat(filename)
         name = [k for k in data.keys() if not k.startswith('__')]
-        if self.size:
+        if self.size is not None:
             return imresize(data[name.pop()], self.size)
         return data[name.pop()]
         
