@@ -54,7 +54,7 @@ class FixMat(object):
         self._parameters = {}
         if fixmat is not None and index is not None:
             index = index.reshape(-1,).astype(bool)
-            assert index.shape[0] == fixmat.x.shape[0], ("Index vector for " +
+            assert index.shape[0] == fixmat._num_fix, ("Index vector for " +
                 "filtering has to have the same length as the fields of the fixmat")
             self._subjects = fixmat._subjects
             self._fields = fixmat._fields
@@ -284,11 +284,11 @@ class FixMat(object):
                 one subject"""))
         
         # Check if parameters are equal
-        for ((n_cu, v_cu), (_, v_all)) in zip(fm_new._parameters.iteritems(),
-                                                self._parameters.iteritems()):
-            if not v_cu == v_all:
-                raise (RuntimeError("""Parameter %s has value %s in current and
-                     value %s in new fixmat""" %(n_cu, str(v_all), str(v_cu))))
+        #for ((n_cu, v_cu), (_, v_all)) in zip(fm_new._parameters.iteritems(),
+        #                                        self._parameters.iteritems()):
+        #    if not v_cu == v_all:
+        #        raise (RuntimeError("""Parameter %s has value %s in current and
+        #             value %s in new fixmat""" %(n_cu, str(v_all), str(v_cu))))
 
         # Check if same fields are present, if not only use minimal subset
         new_fields = []
@@ -474,7 +474,7 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
         (fixmat.image_size[1] > 0)), 'The image_size is either 0, or not 2D'
     assert fixmat.pixels_per_degree, 'Fixmat has to have a pixels_per_degree field'
     # check whether fixmat contains fixations
-    if len(fixmat.x) == 0:
+    if fixmat._num_fix == 0:
         raise NoFixations('There are no fixations in the fixmat.')
 
     assert not scale_factor <= 0, "scale_factor has to be > 0"
@@ -489,8 +489,7 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
     fdm = gaussian_filter(hist, kernel_sigma, order=0, mode='constant')
     return fdm / fdm.sum()
 
-
-def relative_bias(fm, center=None, radius=None, scale_factor = 1):
+def relative_bias(fm,  scale_factor = 1, estimator = None):
     """
     Computes the relative bias, i.e. the distribution of saccade angles 
     and amplitudes. 
@@ -498,53 +497,38 @@ def relative_bias(fm, center=None, radius=None, scale_factor = 1):
     Parameters:
         fm : FixMat
             The fixation data to use
-        center : 2D Point (Tuple)
-            Only saccades that are at most 'radius' px. away from 'center'
-            are considered for computing the distribution.
-        radius : double
-            Only saccades that are at most 'radius' px. away from 'center'
-            are considered for computing the distribution.
         scale_factor : double
     Returns:
         2D probability distribution of saccade angles and amplitudes.
     """
     assert 'fix' in fm.fieldnames(), "Can not work without fixation  numbers"
-    if not center:
-        x = fm.image_size[1]/2.0
-        y = fm.image_size[0]/2.0
-    else:
-        (y, x) = center
-    if not radius:
-        radius = (x**2 + y**2) ** .5
-   
-    # Add two fields to our fixmat: distance and difference
-    # calculate how far this fixation is from the center of interest,
-    dist = ((fm.x-x)**2 + (fm.y-y)**2)**.5
-    # Now calculate the direction where the NEXT fixation goes to
-    diff_x = np.roll(fm.x, 1) - fm.x
-    diff_y = np.roll(fm.y, 1) - fm.y
-    # We can not include those fixation pairs that are 
-    # a) not on the same stimulus and
-    # b) where fixations are not consecutive
     excl = fm.fix - np.roll(fm.fix, 1) != 1
-    # Add to fixmat
-    fm.add_field('dist', dist)
-    fm.add_field('diff_x', diff_x)
-    fm.add_field('diff_y', diff_y)
-    
-    # Find all fixations that are within radius around (y,x)
-    f_filt = fm[ (~excl) & (fm.dist <= radius)]
+
+    # Now calculate the direction where the NEXT fixation goes to
+    diff_x = (np.roll(fm.x, 1) - fm.x)[~excl]
+    diff_y = (np.roll(fm.y, 1) - fm.y)[~excl]
+       
 
     # Make a histogram of diff values
     # this specifies left edges of the histogram bins, i.e. fixations between
     # ]0 binedge[0]] are included. --> fixations are ceiled
     ylim =  np.round(scale_factor * fm.image_size[0])
     xlim =  np.round(scale_factor * fm.image_size[1])
-    e_y = np.arange(-ylim, ylim+1)
-    e_x = np.arange(-xlim, xlim+1)
-    samples = np.array(zip((scale_factor * f_filt.diff_y),
-                             (scale_factor*f_filt.diff_x)))
-    (hist, _) = np.histogramdd(samples, (e_y, e_x))
+    x_steps = np.ceil(2*xlim) +1
+    if x_steps % 2 != 0: x_steps+=1
+    y_steps = np.ceil(2*ylim)+1
+    if y_steps % 2 != 0: y_steps+=1
+    e_x = np.linspace(-xlim,xlim,x_steps)
+    e_y = np.linspace(-ylim,ylim,y_steps)
+
+    #e_y = np.arange(-ylim, ylim+1)
+    #e_x = np.arange(-xlim, xlim+1)
+    samples = np.array(zip((scale_factor * diff_y),
+                             (scale_factor* diff_x)))
+    if estimator == None:
+        (hist, _) = np.histogramdd(samples, (e_y, e_x))
+    else:
+        hist = estimator(samples, e_y, e_x)
     return hist
      
 class NoFixations(Exception):

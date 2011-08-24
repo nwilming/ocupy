@@ -379,6 +379,6 @@ def emd(prediction, ground_truth):
     return d
 
 # Default list of measures 
-scores = [roc_model, nss_model, kldiv_model]
+scores = [roc_model, nss_model, kldiv_model, correlation_model]
 
 
