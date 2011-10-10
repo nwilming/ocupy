@@ -46,8 +46,9 @@ class TestMeasures(unittest.TestCase):
         kl = measures.kldiv_model(fdm, fm)
         self.assertTrue(kl < 10**-13, 
                 "KL Divergence between same distribution should be almost 0")
-        fm.x = []
-        fm.y = []
+        fm.x = np.array([])
+        fm.y = np.array([])
+        
         kl = measures.kldiv(None, None, distp = fm, distq = fm, scale_factor = 0.25)
         self.assertTrue(np.isnan(kl))
 
@@ -162,13 +163,15 @@ class TestMeasures(unittest.TestCase):
    
  
     def test_nss(self):
-        fm = fixmat.TestFixmatFactory(points=zip([0,500,1000],[1,10,10]),params = {'image_size':[100,10]})
+        fm = fixmat.TestFixmatFactory(points=zip([0,500,1000],[1,10,10]),
+                params = {'image_size':[100,10]})
         fm.SUBJECTINDEX = np.array([1,1,1])
         fm.filenumber = np.array([1,1,1])
         fm.category = np.array([1,1,1])
         fm.x = np.array([0,50,1000])
         fm.y = np.array([1,10,10])
         fm.fix = np.array([1,2,3])
+        fm._num_fix = 3
         fdm = fixmat.compute_fdm(fm[(fm.x<10) & (fm.y<10)])
         self.assertRaises(IndexError, lambda: measures.nss(fdm, (fm.y, fm.x))) 
 

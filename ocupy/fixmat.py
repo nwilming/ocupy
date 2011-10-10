@@ -333,7 +333,7 @@ class FixMat(object):
             features : string
                 list of feature names for which feature values are extracted.
         """
-        if not 'x' in self._fieldnames:
+        if not 'x' in self.fieldnames():
             raise RuntimeError("""add_feature_values expects to find
         (x,y) locations in self.x and self.y. But self.x does not exist""")
  
@@ -383,7 +383,7 @@ class FixMat(object):
             Rows = Feature number /type
             Columns = Feature values
         """
-        if not 'x' in self._fieldnames:
+        if not 'x' in self.fieldnames():
             raise RuntimeError("""make_reg_data expects to find
         (x,y) locations in self.x and self.y. But self.x does not exist""")
 
@@ -474,7 +474,7 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
         (fixmat.image_size[1] > 0)), 'The image_size is either 0, or not 2D'
     assert fixmat.pixels_per_degree, 'Fixmat has to have a pixels_per_degree field'
     # check whether fixmat contains fixations
-    if fixmat._num_fix == 0:
+    if fixmat._num_fix == 0 or len( fixmat.x) == 0 or len(fixmat.y) == 0 :
         raise NoFixations('There are no fixations in the fixmat.')
 
     assert not scale_factor <= 0, "scale_factor has to be > 0"
