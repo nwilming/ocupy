@@ -1,4 +1,4 @@
-from math import ceil, degrees, radians
+from math import ceil, degrees, radians, cos, sin
 from ocupy import fixmat
 import numpy as np
 import random
