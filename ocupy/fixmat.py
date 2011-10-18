@@ -94,6 +94,7 @@ class FixMat(object):
         Returns a filtered fixmat which only includes fixation that are
         allowed by index 
         
+		
         Parameters:
             index : numpy array
                 A logical array that is True for fixations that are in 
