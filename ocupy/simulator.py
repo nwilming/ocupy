@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 """This module implements a generator of data with given second-order dependencies"""
 
-from math import asin, atan2, degrees, radians, ceil, cos, sin 
+from math import floor, asin, atan2, degrees, radians, ceil, cos, sin 
 import random
 
+import ocupy
 from ocupy import fixmat
 import spline_base
 from progressbar import ProgressBar, Percentage, Bar
 import numpy as np
+
 
 
 class AbstractSim(object):
@@ -52,7 +54,7 @@ class FixGen(AbstractSim):
 		
 		if type(fm_name)==str:
 			self.fm = fixmat.FixmatFactory(fm_name)
-		elif type(fm_name)==ocupy.FixMat.fixmat:
+		elif type(fm_name)==ocupy.fixmat.FixMat:
 			self.fm = fm_name
 		else:
 			raise ValueError("Not a valid argument, insert fixmat or path to fixmat")
@@ -355,25 +357,26 @@ def reshift(I):
 			Number or numbers that shall be reshifted.
 	
 	Returns:
-		int or float or array : Reshifted number or numbers
+		numpy.ndarray : Reshifted number or numbers as array
 	'''
 	# Output -180 to +180
 	if type(I)==list:
 		I = np.array(I)
-	
-	if type(I)==np.ndarray:
-		while(sum(I>180)>0 or sum(I<-180)>0):
-			I[I>180] = I[I>180]-360
-			I[I<-180] = I[I<-180]+360
-
+	'''
 	if type(I)==int or type(I)==np.float64 or type(I)==float or type(I)==np.float:
+		
+		
+		
 		while (I>180 or I<-180):
 			if I > 180:
 				I-=360
 			if I < -180:
 				I+=360
+		'''
+	#	I = np.array([I])
 	
-	return I
+		
+	return ((I-180)%360)-180
 
 def spline(ad,ld,collapse=True,xdim=[-36,36]):
 	'''
