@@ -3,13 +3,13 @@
 
 from os.path import join
 from warnings import warn
-import cPickle
 from glob import glob
 
 import numpy as np
 from scipy.io import loadmat
 from scipy.ndimage.filters import gaussian_filter
 
+import h5py
 
 class FixMat(object):
     """
@@ -136,7 +136,8 @@ class FixMat(object):
         
         """
         return FixMat(categories=self._categories, fixmat=self, index=index)
-            
+    
+
             
     def save(self, path):
         """
@@ -146,20 +147,15 @@ class FixMat(object):
             path : string   
                 Absolute path of the file to save to.
         """
-        savefile = open(path,'wb')
-        cPickle.dump( self, savefile)
-   
-    @staticmethod
-    def load(path):
-        """
-        Load fixmat at path.
-        
-        Parameters:
-            path : string
-                Absolute path of the file to load from.
-        """
-        return cPickle.load(open(path, 'r'))
-            
+        f = h5py.File(path, 'w')
+        fm_group = f.create_group('Fixmat')
+        for field in self.fieldnames():
+            fm_group.create_dataset(field, data = self.__dict__[field])
+        for param in self.parameters():
+            fm_group.attrs[param]=self.__dict__[param]
+        f.close()
+
+                
     def fieldnames(self):
         """
         Returns a list of data fields that are present in the fixmat.
@@ -439,6 +435,26 @@ class FixMat(object):
                 all_act = np.hstack((all_act, actuals[1:, :]))
                 all_ctrls = np.hstack((all_ctrls, controls[1:, :]))
         return (all_act[:, 1:], all_ctrls[:, 1:]) # first column was dummy 
+
+
+def load(path):
+    """
+    Load fixmat at path.
+    
+    Parameters:
+        path : string
+            Absolute path of the file to load from.
+    """
+    f = h5py.File(path,'r')
+    fm_group = f['Fixmat']
+    fields = {}
+    params = {}
+    for field, value in fm_group.iteritems():
+        fields[field] = np.array(value)
+    for param, value in fm_group.attrs.iteritems():
+        params[param] = value
+    f.close()
+    return VectorFixmatFactory(fields, params)
 
 
 def compute_fdm(fixmat, fwhm=2, scale_factor=1):

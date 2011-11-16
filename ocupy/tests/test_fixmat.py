@@ -50,7 +50,7 @@ class TestFixmat(unittest.TestCase):
         
         # Test save and load
         fm_sub1.save('/tmp/test_fixmat')
-        fm_cmp = fm.load('/tmp/test_fixmat')
+        fm_cmp = fixmat.load('/tmp/test_fixmat')
         self.compare_fixmats(fm_sub1, fm_cmp)
        
         self.assertTrue( 'pixels_per_degree' in fm.parameters() )
