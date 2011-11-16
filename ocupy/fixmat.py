@@ -136,7 +136,12 @@ class FixMat(object):
         
         """
         return FixMat(categories=self._categories, fixmat=self, index=index)
-            
+
+    def field(self, fieldname):
+        """
+        Return field fieldname.
+        """
+        return self.__dict__[fieldname]
             
     def save(self, path):
         """
