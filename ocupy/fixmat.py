@@ -139,9 +139,17 @@ class FixMat(object):
 
     def field(self, fieldname):
         """
-        Return field fieldname.
+        Return field fieldname. fm.field('x') is equivalent to fm.x.
+
+        Parameters:
+            fieldname : string
+                The name of the field to be returned.
         """
-        return self.__dict__[fieldname]
+        try:
+            return self.__dict__[fieldname]
+        except KeyError:
+            raise ValueError('%s is not a field or parameter of the fixmat'
+                    % fieldname)
             
     def save(self, path):
         """
