@@ -43,6 +43,8 @@ class TestSimulator(unittest.TestCase):
 			fm.x = np.array([x[0] for x in coord])
 			fm.y = np.array([x[1] for x in coord])
 			
+			gen.initializeData()
+			
 			# Use anglendiff to calculate angles and angle_diff
 			a, l, ad, ld = simulator.anglendiff(fm, return_abs=True)
 			a = np.round(a[0])	
@@ -55,15 +57,40 @@ class TestSimulator(unittest.TestCase):
 			cur_angle[np.round(cur_angle)==-180]=180
 				
 			ad = np.round(simulator.reshift(ad[0][~np.isnan(ad[0])]))
+			pdb.set_trace()
 			
 			if (angle==180 or angle==-180):
 				self.assertTrue(np.logical_or(ad==angle, ad==-angle).all())
-				
+			
 			else:
 				self.assertTrue((ad==angle).all())
 				self.assertTrue((a[~np.isnan(a)]==cur_angle[~np.isnan(cur_angle)]).all())
-				
-
+	
+	
+	def test_simulating(self):
+	
+		fixhists = []
+		# Create some fixhists for testing
+		
+		#Crosses
+		K=np.eye(73,73)+np.rot90(np.eye(73,73))
+		K = np.concatenate((K,K,K,K,K),axis=1)[0:,0:-5]
+		fixhists.append(K/K.sum())
+		
+		#Rectangle
+		K=np.zeros((73,360))
+		K[0:3]=1
+		K[-2:]=1
+		K[0:,1:3]=1
+		K[0:,-3:-1]=1
+		fixhists.append(K/K.sum())
+		
+		# Stripe
+		K = np.zeros((73,360))
+		K[:,35:37]=1
+		
+		
+		
 	
 		
 if __name__ == '__main__':

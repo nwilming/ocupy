@@ -22,7 +22,57 @@ class AbstractSim(object):
 	def finish(self):
 		raise NotImplementedError
 
+def makeHist(ad,ld,collapse=True, fit='spline'):
+	'''
+	Histograms and performs a spline fit on the given data, 
+	usually angle and length differences.
+	
+	Parameters:
+		ad : array
+			The data to be histogrammed along the x-axis. 
+			May range from -180 to 180.
+		ld : array
+			The data to be histogrammed along the y-axis.
+			May range from -36 to 36.
+		xdim : list, optional
+			Gives the range of values on the y-axis in case of the uncollapsed 
+			histogram. Defaults to [-36,36].
+	'''
+	ld = ld[~np.isnan(ld)]
+	ad = reshift(ad[~np.isnan(ad)])	
+	samples = zip(ld,ad)
 
+	if collapse: # von 0 bis 181
+		e_y = np.linspace(-36.5,36.5,74)
+		e_x = np.linspace(-0.5,180.5,182)
+		K, xedges, yedges = np.histogram2d(ld[~np.isnan(ld)], ad[~np.isnan(ad)], bins=[e_y,e_x])
+		K = K / sum(sum(K))
+		K[:,0]*=2  
+		K[:,-1]*=2
+		
+		if (fit=='None'):
+			return K
+			
+		elif (fit=='spline'):
+			H = spline_base.spline_pdf(np.array(samples), e_y, e_x, nr_knots_y = 4, nr_knots_x = 10,hist=K)		
+			return H/H.sum()
+			
+	else:
+		e_x = np.linspace(-180.5,179.5,361)
+		e_y = np.linspace(-36.5,36.5,74)
+		ad[ad>179.5]-=360
+		
+		if (fit=='None'):
+			K, xedges, yedges = np.histogram2d(ld[~np.isnan(ld)], ad[~np.isnan(ad)], bins=[e_y,e_x])
+			K = K / sum(sum(K))
+			#K[:,0]*=2  
+			#K[:,-1]*=2
+			return K
+			
+		elif (fit=='spline'):
+			H = spline_base.spline_pdf(np.array(samples), e_y, e_x, nr_knots_y = 4, nr_knots_x = 10)		
+			return H/H.sum()
+	
 class FixGen(AbstractSim):
 	'''
 	Generates fixation data.
@@ -48,7 +98,7 @@ class FixGen(AbstractSim):
 		Parameters: 
 			fm_name: string or ocupy.fixmat
 				The fixation data to replicate in fixmat format.
-				Note: If the first fixation in the set was always kept centered, 
+				Note: If the first fixation in the set was always kept centered,
 				they have to be deleted prior to passing the fixmat to this function.				
 		'''
 		
@@ -65,7 +115,7 @@ class FixGen(AbstractSim):
 			self.firstfixcentered = True
 			
 		
-	def initializeData(self):
+	def initializeData(self, fit='spline',full_H1=None):
 		'''
 		Prepares the data to be replicated. Calculates the second-order length and angle
 		dependencies between saccades and stores them in a fitted histogram.
@@ -74,18 +124,22 @@ class FixGen(AbstractSim):
 		screen_diag = int(ceil((np.sum(np.array(self.fm.image_size)**2)**.5)
 												/self.fm.pixels_per_degree))
 		
-		self.full_H1 = spline(ad[0],ld[0]/self.fm.pixels_per_degree,
-							collapse=False,xdim=[-screen_diag,screen_diag])
+		if full_H1==None:
+			self.full_H1 = makeHist(ad[0],ld[0]/self.fm.pixels_per_degree,
+									collapse=False,fit=fit)
+		else:
+			self.full_H1 = full_H1
 		
 		self.firstLengthsAngles_cumsum, self.firstLengthsAngles_shape = (
 									compute_cumsum(self.fm, 'la'))
-		self.probability_cumsum = np.cumsum(np.concatenate(self.full_H1))
+		self.probability_cumsum = np.cumsum(self.full_H1.flat)
 		self.firstcoordinates_cumsum = compute_cumsum(self.fm,'coo')
 		self.trajectoryLengths_cumsum, self.trajectoryLengths_borders = compute_cumsum(self.fm, 'len')
 		
 		# Counters for saccades that have to be canceled during the process
 		self.canceled = 0
 		self.minusSaccades = 0
+		self.drawn = []
 		
 		
 	def _calc_xy(self, (x,y), angle, length):
@@ -120,11 +174,12 @@ class FixGen(AbstractSim):
 		if (prev_angle == None) or (prev_length == None):
 			(length, angle) = np.unravel_index(drawFrom(self.firstLengthsAngles_cumsum),
 					self.firstLengthsAngles_shape)
-			angle = angle-((self.firstLengthsAngles_shape[1]-1)/2.0)
+			angle = angle-((self.firstLengthsAngles_shape[1]-1)/2)
 		else:
 			J, I = np.unravel_index(drawFrom(self.probability_cumsum), self.full_H1.shape)
-			angle = reshift((I-self.full_H1.shape[1]/2.0) + prev_angle)
-			length = prev_length + ((J-self.full_H1.shape[0]/2.0)*self.fm.pixels_per_degree)
+			angle = reshift((I-self.full_H1.shape[1]/2) + prev_angle)
+			self.drawn = np.append(self.drawn, J)
+			length = prev_length + ((J-self.full_H1.shape[0]/2)*self.fm.pixels_per_degree)
 		return angle, length
 	
 	def parameters(self):
@@ -133,7 +188,7 @@ class FixGen(AbstractSim):
 	def finish(self):
 		pass
 	
-	def sample_many(self, num_samples = 500):
+	def sample_many(self, num_samples = 2000):
 		'''
 		Generates a given number of trajectories, using the method sample(). 
 		Returns a fixmat with the generated data.
@@ -201,6 +256,10 @@ class FixGen(AbstractSim):
 				angles.append(angle)
 				fix.append(fix[-1]+1)
 		return coordinates
+	
+	
+		
+		
 		
 def anglendiff(fm, roll = 1, return_abs=False):
 	'''
@@ -259,28 +318,6 @@ def anglendiff(fm, roll = 1, return_abs=False):
 	else:
 		return angle_diffs, length_diffs
 			
-def createHist(ld, ad, bins=[np.linspace(-36.5,36.5,74), np.linspace(-0.5,180.5,182)]):
-	'''
-	Creates and returns a 2D-histogram, typically of length and angle difference pairs.
-	
-	Parameters:
-		ld : array 
-				Values to be histogrammed along the x-axis, 
-				typically length differences
-		ad : array 
-				Values to be histogrammed along the y-axis,
-				typically angle differences
-		bins : list of two arrays, optional
-				The bin borders to be used for the histogram. 
-				Defaults to [-36,36] on the y-axis and [0,180] on the x-axis, where
-				36 is the screen diagonal of a typical screen.
-	'''
-	H, xedges, yedges = np.histogram2d(ld[~np.isnan(ld)], ad[~np.isnan(ad)], bins=bins)
-	H = H / sum(sum(H))
-	H[:,0]*=2  
-	H[:,-1]*=2
-	return H
-	
 def compute_cumsum(fm, arg):
 	'''
 	Creates a probability distribution, transforms it to a single row array
@@ -322,8 +359,8 @@ def compute_cumsum(fm, arg):
 	else:
 		raise ValueError("Not a valid argument, choose from 'la', 'coo' and 'len'.")
 		
-	H = createHist(y_arg, x_arg, bins=bins)
-	return np.cumsum(np.concatenate(H)), H.shape
+	H = makeHist(x_arg, y_arg, fit='None')
+	return np.cumsum(H.flat), H.shape
 	
 def drawFrom(cumsum, borders=[]):
 	'''
@@ -378,43 +415,15 @@ def reshift(I):
 		
 	return ((I-180)%360)-180
 
-def spline(ad,ld,collapse=True,xdim=[-36,36]):
-	'''
-	Histograms amd performs a spline fit on the given data, 
-	usually angle and length differences.
 	
-	Parameters:
-		ad : array
-			The data to be histogrammed along the x-axis. 
-			May range from -180 to 180.
-		ld : array
-			The data to be histogrammed along the y-axis.
-			May range from -36 to 36.
-		xdim : list, optional
-			Gives the range of values on the y-axis in case of the uncollapsed 
-			histogram. Defaults to [-36,36].
-	'''
-	ld = ld[~np.isnan(ld)]
-	ad = reshift(ad[~np.isnan(ad)])	
-	samples = zip(ld,ad)
 
-	if collapse: # von 0 bis 181
-		e_y = np.linspace(-36.5,36.5,74)
-		e_x = np.linspace(-0.5,180.5,182)
-		ad = abs(ad)
-		K = createHist(ld,ad)
-		H = spline_base.spline_pdf(np.array(samples), e_y, e_x, nr_knots_y = 4, nr_knots_x = 10,hist=K)		
+	
+	
 
-	else:
-		e_x = np.linspace(-180.5,179.5,361)
-		e_y = np.linspace(xdim[0],xdim[1],(xdim[1]*2)+1)
-		ad[ad>179.5]-=360
-		samples = zip(ld,ad)
-
-		H = spline_base.spline_pdf(np.array(samples), e_y, e_x, nr_knots_y = 4, nr_knots_x = 10)
-	return H/H.sum()
 
 if __name__ == '__main__':
 	sim = FixSim('fixmat_photos.mat')
 	#sim.set_path()
 	simfm = sim.sample_many(num_samples=6263)
+	
+
