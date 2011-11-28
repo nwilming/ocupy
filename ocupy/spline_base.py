@@ -1,6 +1,4 @@
 import numpy as np
-from res.analysis.utils import memoize
-from res.analysis.logistic_regression import logistic_regression
 import scikits.statsmodels as sm
 
 def spline_fdm(fm,base_spec = None, spline_order = 3):
@@ -15,7 +13,7 @@ def spline_fdm(fm,base_spec = None, spline_order = 3):
     # compute down scale factor
     down_scale = float(height)/fm.image_size[0] 
     # compute basis
-    base = spline_base(height, width, nr_knots_x, nr_knots_y, spline_order)
+    #base = spline_base(height, width, nr_knots_x, nr_knots_y, spline_order)
     # compute target histogram
     # this specifies left edges of the histogram bins, i.e. fixations between
     # ]0 binedge[0]] are included. --> fixations are ceiled
@@ -77,7 +75,8 @@ def augknt(knots,order):
     return np.array(a)     
 
 #@memoize
-def spline_base(height, width,Nr_Knots_x = 5.0, Nr_Knots_y = 5.0, spline_order = 3,scale_factor=None):
+def spline_base(height, width, Nr_Knots_x = 5.0, Nr_Knots_y = 5.0, 
+        spline_order = 3,scale_factor=None):
     """Computes a set of 2D spline basis functions. 
     
     The basis functions cover the entire space in height*width and can 
@@ -136,11 +135,13 @@ def N(u,i,p,knots):
             return 0.0
     else:
         try:
-            k = ( float((u-knots[i]))/float((knots[i+p] - knots[i]) )) * N(u,i,p-1,knots)
+            k = (( float((u-knots[i]))/float((knots[i+p] - knots[i]) )) 
+                    * N(u,i,p-1,knots))
         except ZeroDivisionError:
             k = 0.0
         try:
-            q = ( float((knots[i+p+1] - u))/float((knots[i+p+1] - knots[i+1]))) * N(u,i+1,p-1,knots)
+            q = (( float((knots[i+p+1] - u))/float((knots[i+p+1] - knots[i+1])))
+                    * N(u,i+1,p-1,knots))
         except ZeroDivisionError:
             q  = 0.0 
         return float(k + q)
