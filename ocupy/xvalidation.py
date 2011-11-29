@@ -43,7 +43,7 @@ class SimpleXValidation(XValidation):
         """
         Generator for creating the cross-validation slices.
 
-        Returns:
+        Returns
             A tuple of that contains two fixmats (training and test)
             and two Category objects (test and train).
         """

@@ -4,7 +4,7 @@
 import unittest
 import numpy as np
 
-from ocupy import fixmat, bounds
+from ocupy import fixmat, bounds, measures
 
 
 class TestBounds(unittest.TestCase):
@@ -13,7 +13,9 @@ class TestBounds(unittest.TestCase):
                                 filenumbers = [1,2,3,4,5,6],
                                 subjectindices = [1, 2, 3, 4, 5, 6],
                                 params = {'pixels_per_degree':1, 'image_size':[100,500]})
-        
+        measures.set_scores([measures.roc_model,
+                             measures.kldiv_model,
+                             measures.nss_model])
     # test for category > 0 assertion
     def test_intersubject_scores(self):
         auc, kl, nss = bounds.intersubject_scores(self.fm,

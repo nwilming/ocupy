@@ -3,13 +3,13 @@
 
 from os.path import join
 from warnings import warn
-import cPickle
 from glob import glob
 
 import numpy as np
 from scipy.io import loadmat
 from scipy.ndimage.filters import gaussian_filter
 
+import h5py
 
 class FixMat(object):
     """
@@ -54,7 +54,7 @@ class FixMat(object):
         self._parameters = {}
         if fixmat is not None and index is not None:
             index = index.reshape(-1,).astype(bool)
-            assert index.shape[0] == fixmat.x.shape[0], ("Index vector for " +
+            assert index.shape[0] == fixmat._num_fix, ("Index vector for " +
                 "filtering has to have the same length as the fields of the fixmat")
             self._subjects = fixmat._subjects
             self._fields = fixmat._fields
@@ -68,16 +68,19 @@ class FixMat(object):
     
     def __str__(self):
         desc = "Fixmat with %i fixations and the following data fields:\n" % (
-                                                                    len(self.x))
+                                                                    self._num_fix)
         desc += "%s | %s | %s | %s \n" % ('Field Name'.rjust(20),
                                           'Length'.center(13), 
                                           'Type'.center(10), 
                                           'Values'.center(20))
         desc += "---------------------+---------------+------------+----------------\n"
         for field in self._fields:
-            num_uniques = np.unique(self.__dict__[field])
-            if len(num_uniques) > 5:
-                num_uniques = 'Many'
+            if not self.__dict__[field].dtype == np.object:
+                num_uniques = np.unique(self.__dict__[field])
+                if len(num_uniques) > 5:
+                    num_uniques = 'Many'
+            else:
+                num_uniques = 'N/A'
             desc += "%s | %s | %s | %s \n" % (field.rjust(20), 
                                     str(len(self.__dict__[field])).center(13),
                                     str(self.__dict__[field].dtype).center(10),
@@ -134,7 +137,20 @@ class FixMat(object):
         
         """
         return FixMat(categories=self._categories, fixmat=self, index=index)
-            
+
+    def field(self, fieldname):
+        """
+        Return field fieldname. fm.field('x') is equivalent to fm.x.
+
+        Parameters:
+            fieldname : string
+                The name of the field to be returned.
+        """
+        try:
+            return self.__dict__[fieldname]
+        except KeyError:
+            raise ValueError('%s is not a field or parameter of the fixmat'
+                    % fieldname)
             
     def save(self, path):
         """
@@ -144,20 +160,15 @@ class FixMat(object):
             path : string   
                 Absolute path of the file to save to.
         """
-        savefile = open(path,'wb')
-        cPickle.dump( self, savefile)
-   
-    @staticmethod
-    def load(path):
-        """
-        Load fixmat at path.
-        
-        Parameters:
-            path : string
-                Absolute path of the file to load from.
-        """
-        return cPickle.load(open(path, 'r'))
-            
+        f = h5py.File(path, 'w')
+        fm_group = f.create_group('Fixmat')
+        for field in self.fieldnames():
+            fm_group.create_dataset(field, data = self.__dict__[field])
+        for param in self.parameters():
+            fm_group.attrs[param]=self.__dict__[param]
+        f.close()
+
+                
     def fieldnames(self):
         """
         Returns a list of data fields that are present in the fixmat.
@@ -282,11 +293,11 @@ class FixMat(object):
                 one subject"""))
         
         # Check if parameters are equal
-        for ((n_cu, v_cu), (_, v_all)) in zip(fm_new._parameters.iteritems(),
-                                                self._parameters.iteritems()):
-            if not v_cu == v_all:
-                raise (RuntimeError("""Parameter %s has value %s in current and
-                     value %s in new fixmat""" %(n_cu, str(v_all), str(v_cu))))
+        #for ((n_cu, v_cu), (_, v_all)) in zip(fm_new._parameters.iteritems(),
+        #                                        self._parameters.iteritems()):
+        #    if not v_cu == v_all:
+        #        raise (RuntimeError("""Parameter %s has value %s in current and
+        #             value %s in new fixmat""" %(n_cu, str(v_all), str(v_cu))))
 
         # Check if same fields are present, if not only use minimal subset
         new_fields = []
@@ -331,7 +342,10 @@ class FixMat(object):
             features : string
                 list of feature names for which feature values are extracted.
         """
-        
+        if not 'x' in self.fieldnames():
+            raise RuntimeError("""add_feature_values expects to find
+        (x,y) locations in self.x and self.y. But self.x does not exist""")
+ 
         if not self._categories:
             raise RuntimeError(
             '''"%s" does not exist as a fieldname and the
@@ -378,6 +392,10 @@ class FixMat(object):
             Rows = Feature number /type
             Columns = Feature values
         """
+        if not 'x' in self.fieldnames():
+            raise RuntimeError("""make_reg_data expects to find
+        (x,y) locations in self.x and self.y. But self.x does not exist""")
+
         if (self.x < 2 * self.pixels_per_degree).any():
             warn('There are fixations within 2deg visual ' +
             'angle of the image border')
@@ -432,6 +450,26 @@ class FixMat(object):
         return (all_act[:, 1:], all_ctrls[:, 1:]) # first column was dummy 
 
 
+def load(path):
+    """
+    Load fixmat at path.
+    
+    Parameters:
+        path : string
+            Absolute path of the file to load from.
+    """
+    f = h5py.File(path,'r')
+    fm_group = f['Fixmat']
+    fields = {}
+    params = {}
+    for field, value in fm_group.iteritems():
+        fields[field] = np.array(value)
+    for param, value in fm_group.attrs.iteritems():
+        params[param] = value
+    f.close()
+    return VectorFixmatFactory(fields, params)
+
+
 def compute_fdm(fixmat, fwhm=2, scale_factor=1):
     """
     Computes a fixation density map for the calling fixmat. 
@@ -465,10 +503,10 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
         (fixmat.image_size[1] > 0)), 'The image_size is either 0, or not 2D'
     assert fixmat.pixels_per_degree, 'Fixmat has to have a pixels_per_degree field'
     # check whether fixmat contains fixations
-    if len(fixmat.x) == 0:
+    if fixmat._num_fix == 0 or len( fixmat.x) == 0 or len(fixmat.y) == 0 :
         raise NoFixations('There are no fixations in the fixmat.')
 
-    assert not scale_factor <= 0, "scale_factor has to > 0"
+    assert not scale_factor <= 0, "scale_factor has to be > 0"
     # this specifies left edges of the histogram bins, i.e. fixations between
     # ]0 binedge[0]] are included. --> fixations are ceiled
     e_y = np.arange(0, np.round(scale_factor*fixmat.image_size[0]+1))
@@ -480,8 +518,7 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
     fdm = gaussian_filter(hist, kernel_sigma, order=0, mode='constant')
     return fdm / fdm.sum()
 
-
-def relative_bias(fm, center=None, radius=None, scale_factor = 1):
+def relative_bias(fm,  scale_factor = 1, estimator = None):
     """
     Computes the relative bias, i.e. the distribution of saccade angles 
     and amplitudes. 
@@ -489,53 +526,38 @@ def relative_bias(fm, center=None, radius=None, scale_factor = 1):
     Parameters:
         fm : FixMat
             The fixation data to use
-        center : 2D Point (Tuple)
-            Only saccades that are at most 'radius' px. away from 'center'
-            are considered for computing the distribution.
-        radius : double
-            Only saccades that are at most 'radius' px. away from 'center'
-            are considered for computing the distribution.
         scale_factor : double
     Returns:
         2D probability distribution of saccade angles and amplitudes.
     """
     assert 'fix' in fm.fieldnames(), "Can not work without fixation  numbers"
-    if not center:
-        x = fm.image_size[1]/2.0
-        y = fm.image_size[0]/2.0
-    else:
-        (y, x) = center
-    if not radius:
-        radius = (x**2 + y**2) ** .5
-   
-    # Add two fields to our fixmat: distance and difference
-    # calculate how far this fixation is from the center of interest,
-    dist = ((fm.x-x)**2 + (fm.y-y)**2)**.5
-    # Now calculate the direction where the NEXT fixation goes to
-    diff_x = np.roll(fm.x, 1) - fm.x
-    diff_y = np.roll(fm.y, 1) - fm.y
-    # We can not include those fixation pairs that are 
-    # a) not on the same stimulus and
-    # b) where fixations are not consecutive
     excl = fm.fix - np.roll(fm.fix, 1) != 1
-    # Add to fixmat
-    fm.add_field('dist', dist)
-    fm.add_field('diff_x', diff_x)
-    fm.add_field('diff_y', diff_y)
-    
-    # Find all fixations that are within radius around (y,x)
-    f_filt = fm[ (~excl) & (fm.dist <= radius)]
+
+    # Now calculate the direction where the NEXT fixation goes to
+    diff_x = (np.roll(fm.x, 1) - fm.x)[~excl]
+    diff_y = (np.roll(fm.y, 1) - fm.y)[~excl]
+       
 
     # Make a histogram of diff values
     # this specifies left edges of the histogram bins, i.e. fixations between
     # ]0 binedge[0]] are included. --> fixations are ceiled
     ylim =  np.round(scale_factor * fm.image_size[0])
     xlim =  np.round(scale_factor * fm.image_size[1])
-    e_y = np.arange(-ylim, ylim+1)
-    e_x = np.arange(-xlim, xlim+1)
-    samples = np.array(zip((scale_factor * f_filt.diff_y),
-                             (scale_factor*f_filt.diff_x)))
-    (hist, _) = np.histogramdd(samples, (e_y, e_x))
+    x_steps = np.ceil(2*xlim) +1
+    if x_steps % 2 != 0: x_steps+=1
+    y_steps = np.ceil(2*ylim)+1
+    if y_steps % 2 != 0: y_steps+=1
+    e_x = np.linspace(-xlim,xlim,x_steps)
+    e_y = np.linspace(-ylim,ylim,y_steps)
+
+    #e_y = np.arange(-ylim, ylim+1)
+    #e_x = np.arange(-xlim, xlim+1)
+    samples = np.array(zip((scale_factor * diff_y),
+                             (scale_factor* diff_x)))
+    if estimator == None:
+        (hist, _) = np.histogramdd(samples, (e_y, e_x))
+    else:
+        hist = estimator(samples, e_y, e_x)
     return hist
      
 class NoFixations(Exception):
@@ -672,3 +694,14 @@ def TestFixmatFactory(points = None, categories = [1],
     fixmat._num_fix  = len(fixmat.x)
     return fixmat
 
+def VectorFixmatFactory(fields, parameters, categories = None):
+    fm = FixMat(categories = categories)
+    fm._fields = fields.keys()
+    for (field, value) in fields.iteritems(): 
+        fm.__dict__[field] = value 
+    fm._parameters = parameters
+    fm._subjects = None
+    for (field, value) in parameters.iteritems(): 
+       fm.__dict__[field] = value
+    fm._num_fix = len(fm.__dict__[fields.keys()[0]])
+    return fm
