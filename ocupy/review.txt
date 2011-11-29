@@ -1,0 +1,42 @@
+Test coverage
+-------------
+-> Coverage could be higher. Please check the lines that are not covered.
+
+~/local/bin/nosetests --with-coverage --cover-package=ocupy tests/test_simulator.py                                        
+Name                Stmts   Miss  Cover   Missing
+-------------------------------------------------
+ocupy                   0      0   100%   
+ocupy.fixmat          280    220    21%   56-67, 70-93, 113, 139, 149-152, 163-169, 176, 185, 199-200, 214-219, 233-238, 250-259, 269-273, 290-325, 345-369, 395-450, 461-470, 502-519, 533-561, 568, 571, 592-601, 663-695, 698-707
+-> ocupy.simulator       168     68    60%   16, 18, 20, 22, 55-57, 71-73, 105, 109, 130, 173-182, 185, 188, 200-217, 225-254, 356, 373-376, 397, 407-409
+ocupy.spline_base      75     66    12%   6-23, 26-37, 41-42, 62-65, 71-75, 100-122, 131-147
+-------------------------------------------------
+TOTAL                 523    354    32%   
+----------------------------------------------------------------------
+Ran 3 tests in 3.596s
+
+OK
+
+
+Documentation
+-------------
+
+- documentation is missing in tools.py
+- missing doc in tests/test_simulator.py
++ good documentation in simulator.py
+
+
+Pyflakes output
+---------------
+
+pyflakes simulator.py                            
+simulator.py:124: local variable 'screen_diag' is assigned to but never used
+simulator.py:351: local variable 'bins' is assigned to but never used
+simulator.py:425: undefined name 'FixSim'
+
+Pylint
+------
+
+simulator.py >>> Your code has been rated at -4.22/10
+tools.py >>> Your code has been rated at 0.73/10
+tests/test_simulator.py >>> Your code has been rated at 3.62/10
+

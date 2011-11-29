@@ -40,6 +40,7 @@ setup(name=name,
       'numpy',
       'scipy',
       'PIL',
+      'h5py'
     ],
     test_suite='ocupy.tests',
     extras_require={

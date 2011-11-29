@@ -5,15 +5,15 @@ import pdb
 
 import unittest
 import numpy as np
-from ocupy import fixmat
+from ocupy import fixmat, simulator
 import ocupy
-import simulator
 
 
 class TestSimulator(unittest.TestCase):
     
     def test_init(self):
-        fm = fixmat.FixmatFactory('/home/student/s/sharst/Dropbox/NBP/fixmat_photos.mat')
+        # XXX Beter use self generated data
+        fm = fixmat.FixmatFactory('/net/store/users/nwilming/eq/analysis/qoamp/fixmat_photos.mat')
         gen = simulator.FixGen(fm)
         self.assertTrue(type(gen.fm)==ocupy.fixmat.FixMat)
         # In this data, the first fixation is deleted from the set
@@ -24,7 +24,7 @@ class TestSimulator(unittest.TestCase):
         self.assertTrue(gen.firstfixcentered == False)
         
     def test_anglendiff(self):
-        fm = fixmat.FixmatFactory('/home/student/s/sharst/Dropbox/NBP/fixmat_photos.mat')
+        fm = fixmat.FixmatFactory('/net/store/users/nwilming/eq/analysis/qoamp/fixmat_photos.mat')
         gen = simulator.FixGen(fm)
         
         for angle in [-180, -90, 0, 45, 90, 135]:
@@ -42,7 +42,8 @@ class TestSimulator(unittest.TestCase):
             fm.x = np.array([x[0] for x in coord])
             fm.y = np.array([x[1] for x in coord])
             
-            gen.initializeData()
+            #XXX Parameter should be None, not "None"
+            gen.initializeData(fit='None')
             
             # Use anglendiff to calculate angles and angle_diff
             a, l, ad, ld = simulator.anglendiff(fm, return_abs=True)
@@ -56,7 +57,6 @@ class TestSimulator(unittest.TestCase):
             cur_angle[np.round(cur_angle)==-180]=180
                 
             ad = np.round(simulator.reshift(ad[0][~np.isnan(ad[0])]))
-            pdb.set_trace()
             
             if (angle==180 or angle==-180):
                 self.assertTrue(np.logical_or(ad==angle, ad==-angle).all())
@@ -94,3 +94,4 @@ class TestSimulator(unittest.TestCase):
         
 if __name__ == '__main__':
     unittest.main()
+

@@ -1,5 +1,5 @@
 import numpy as np
-import scikits.statsmodels as sm
+import scikits.statsmodels.api as sm
 
 def spline_fdm(fm,base_spec = None, spline_order = 3):
     # Set up parameters in relation to image_size
@@ -30,7 +30,7 @@ def spline_pdf(samples,e_y,e_x,base=None,nr_knots_x=3,nr_knots_y=3,hist=None):
     if hist == None:
         (hist, _) = np.histogramdd(samples, (e_y, e_x))
     poiss_model = sm.Poisson(hist.reshape(-1,1), base.T)
-    results = poiss_model.fit(maxiter = 7000,method='newton')
+    results = poiss_model.fit(maxiter=100, method='bfgs')
     big_base = spline_base(height*1,width,
           nr_knots_x, nr_knots_y, 3)
     #big_base = sm.add_constant(big_base.T)
