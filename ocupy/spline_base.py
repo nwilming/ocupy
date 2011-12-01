@@ -1,5 +1,5 @@
 import numpy as np
-import scikits.statsmodels.api as sm
+import scikits.statsmodels as sm
 
 def spline_fdm(fm,base_spec = None, spline_order = 3):
     # Set up parameters in relation to image_size
@@ -74,7 +74,22 @@ def augknt(knots,order):
     [a.append(knots[-1]) for t in range(0,order)]
     return np.array(a)     
 
-#@memoize
+def spline_base1d(length, nr_knots = 5, spline_order = 20, marginal = None):
+    """Computes a 1D spline basis"""
+    if marginal is None:
+        knots = augknt(np.linspace(0,length, nr_knots), spline_order)
+    else:
+        cumsum = np.cumsum(marginal)
+        cumsum = cumsum/cumsum.max()
+        borders = np.linspace(0,1,nr_knots)[1:]
+        intervals = [0] + [np.where(cumsum>=b)[0][0] for b in borders]
+        knot_placement = [t1+((t2-t1)/2) for t1,t2 in zip(intervals[:-1], intervals[1:])]
+        knots = augknt(knot_placement, spline_order)
+        
+    x_eval = np.arange(1,length+1).astype(float)
+    Bsplines    = spcol(x_eval,knots,spline_order)
+    return Bsplines
+
 def spline_base(height, width, Nr_Knots_x = 5.0, Nr_Knots_y = 5.0, 
         spline_order = 3,scale_factor=None):
     """Computes a set of 2D spline basis functions. 
