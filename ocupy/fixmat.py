@@ -67,6 +67,7 @@ class FixMat(object):
             self._num_fix = index.sum()
     
     def __len__(self):
+        """return the length of the fixmat's fields."""
         return self._num_fix
 
     def __str__(self):
