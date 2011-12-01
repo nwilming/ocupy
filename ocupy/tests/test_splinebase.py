@@ -10,6 +10,8 @@ from ocupy import spline_base as sb
 
 from scikits.learn import linear_model
 
+import h5py
+
 from pylab import *
 
 class Test1DSplines(unittest.TestCase):
@@ -30,7 +32,7 @@ class Test1DSplines(unittest.TestCase):
                 print num_splines, ' r^2 for ', name, ' is ', np.corrcoef(x+noise, y)[0,1]**2                     
         show()
         
-    def test_tangens(self):
+    def skip_tangens(self):
         x = np.tan(np.linspace(0,np.pi, 99))
         noise = (np.random.random((99,))-.5)
         plot(x+noise)
@@ -49,7 +51,7 @@ class Test1DSplines(unittest.TestCase):
 
 class Test2DSplines(unittest.TestCase):
     
-    def skip_cosine_fit(self):
+    def test_cosine_fit(self):
         x = np.cos(np.linspace(0,np.pi*2, 99))
         X = np.dot(x[:,newaxis],x[:,newaxis].T)
         noise = (np.random.random(X.shape)-.5)*0
@@ -91,6 +93,20 @@ class Test2DSplines(unittest.TestCase):
 
                 print num_splines, ' r^2 for ', name, ' is ', np.corrcoef(X+noise, y.reshape(X.shape))[0,1]**2
         show()
-        
+
+class TestFixationFits(unittest.TestCase):
+
+    def skip_err_samples(self):
+        # For now hard code path
+        data = h5py.File('/home/student/n/nwilming/Desktop/spline_fit_example.hdf5')
+        samples = np.array(data['samples']) 
+        e_x = np.linspace(-180.5,179.5,361)
+        e_y = np.linspace(-36.5,36.5,74)
+        H = sb.spline_pdf(np.array(samples), 
+            e_y, e_x, nr_knots_y = 20, nr_knots_x = 20)       
+        imshow(H)
+        show()
+
+
 if __name__ == '__main__':
     unittest.main()
