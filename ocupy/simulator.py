@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""This module implements a generator of data with given second-order dependencies"""
+"""This module implements a generator of data 
+with given second-order dependencies"""
 
 from math import radians, ceil, cos, sin 
 import random
@@ -7,17 +8,16 @@ import ocupy
 from ocupy import fixmat
 import spline_base
 import numpy as np
-import pdb
-
 
 class AbstractSim(object):
+    """
+    Abstract Object for Simulator creation
+    """
     def __init__(self):
         raise NotImplementedError
     def sample(self):
         raise NotImplementedError
     def parameters(self):
-        raise NotImplementedError
-    def finish(self):
         raise NotImplementedError
 
 def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.spline_pdf):
@@ -44,34 +44,19 @@ def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.spline_pdf):
 
     ld = ld[~np.isnan(ld)]
     ad = reshift(ad[~np.isnan(ad)]) 
-    samples = zip(ld,ad)
 
     if collapse:
-        e_y = np.linspace(-36.5,36.5,74)
-        e_x = np.linspace(-0.5,180.5,182)
+        e_y = np.linspace(-36.5, 36.5, 74)
+        e_x = np.linspace(-0.5, 180.5, 182)
         return makeHist(abs(ad), ld, fit=fit, bins=[e_y, e_x])
-        '''
-        K[:,0]*=2  
-        K[:,-1]*=2
-
-        if (fit is None):
-            return K
-        
-        # Check if given parameter is a function
-        elif hasattr(fit, '__call__'):
-            H = fit(np.array(samples), e_y, e_x, nr_knots_y = 4, nr_knots_x = 10, hist=K)     
-            return H / H.sum()
-            
-        else:
-            raise TypeError("Not a valid argument, insert spline function or None")
-        '''    
     else:
-        e_x = np.linspace(-180.5,179.5,361)
-        e_y = np.linspace(-36.5,36.5,74)
-        ad[ad>179.5]-=360
-        return makeHist(ad, ld, fit=fit, bins=[e_y,e_x])
+        e_x = np.linspace(-180.5, 179.5, 361)
+        e_y = np.linspace(-36.5, 36.5, 74)
+        ad[ad > 179.5] -= 360
+        return makeHist(ad, ld, fit=fit, bins=[e_y, e_x])
 
-def makeHist(x_val, y_val, fit=spline_base.spline_pdf, bins=[np.linspace(-36.5,36.5,73),np.linspace(-180.5,180.5,362)]):
+def makeHist(x_val, y_val, fit=spline_base.spline_pdf, 
+            bins=[np.linspace(-36.5,36.5,73),np.linspace(-180.5,180.5,362)]):
     """
     Constructs a (fitted) histogram of the given data.
     
@@ -91,7 +76,7 @@ def makeHist(x_val, y_val, fit=spline_base.spline_pdf, bins=[np.linspace(-36.5,3
     x_val = x_val[~np.isnan(x_val)]
     
     samples = zip(y_val, x_val)
-    K, xedges, yedges = np.histogram2d(y_val, x_val, bins=bins)
+    K = np.histogram2d(y_val, x_val, bins=bins)[0]
     K = K / sum(sum(K))
     
     if (fit is None):
@@ -99,14 +84,13 @@ def makeHist(x_val, y_val, fit=spline_base.spline_pdf, bins=[np.linspace(-36.5,3
     
     # Check if given attr is a function
     elif hasattr(fit, '__call__'):
-        H = fit(np.array(samples), bins[0], bins[1], nr_knots_y = 4, nr_knots_x = 10, hist=K)
+        H = fit(np.array(samples), bins[0], bins[1], 
+                nr_knots_y = 4, nr_knots_x = 10, hist=K)
         return H/H.sum()
         
     else:
         raise TypeError("Not a valid argument, insert spline function or None")
 
-
-    
 
 class FixGen(AbstractSim):
     """
@@ -118,7 +102,7 @@ class FixGen(AbstractSim):
     In order to work, the initialized FixGen obejct has to initialize its data by calling
     the method initializeData():
 
-            >>> gen = simulator.FixSim(fm)
+            >>> gen = simulator.FixGen(fm)
             >>> gen.initializeData()
     
     Separating this time-consuming step from the initialization is helpful in cases of 
@@ -145,7 +129,7 @@ class FixGen(AbstractSim):
         self.firstfixcentered = firstfixcentered
                     
         
-    def initializeData(self, fit=spline_base.spline_pdf,full_H1=None):
+    def initializeData(self, fit=spline_base.spline_pdf, full_H1=None):
         """
         Prepares the data to be replicated. Calculates the second-order length and angle
         dependencies between saccades and stores them in a fitted histogram.
@@ -160,17 +144,17 @@ class FixGen(AbstractSim):
         ad, ld = anglendiff(self.fm, roll=1) 
                 
         if full_H1 is None:
-            self.full_H1 = makeAngLenHist(ad[0],ld[0]/self.fm.pixels_per_degree,
-                                    collapse=False,fit=fit)
+            self.full_H1 = makeAngLenHist(ad[0], ld[0]/self.fm.pixels_per_degree,
+                                    collapse=False, fit=fit)
         else:
             self.full_H1 = full_H1
         
-        self.firstLengthsAngles_cumsum, self.firstLengthsAngles_shape = (
+        self.firstLenAng_cumsum, self.firstLenAng_shape = (
                                         compute_cumsum(firstSacDist(self.fm)))
         self.probability_cumsum = np.cumsum(self.full_H1.flat)
         
-        self.firstcoordinates_cumsum = compute_cumsum(firstCooDist(self.fm))[0]
-        self.trajectoryLengths_cumsum, self.trajectoryLengths_borders = trajLenDist(self.fm)
+        self.firstcoo_cumsum = compute_cumsum(firstCooDist(self.fm))[0]
+        self.trajLen_cumsum, self.trajLen_borders = trajLenDist(self.fm)
         
         # Counters for saccades that have to be canceled during the process
         self.canceled = 0
@@ -178,7 +162,7 @@ class FixGen(AbstractSim):
         self.drawn = []
         
         
-    def _calc_xy(self, (x,y), angle, length):
+    def _calc_xy(self, (x, y), angle, length):
         """
         Calculates the coordinates after a specific saccade was made.
         
@@ -186,7 +170,8 @@ class FixGen(AbstractSim):
             (x,y) : tuple of floats or ints
                 The coordinates before the saccade was made
             angle : float or int
-                The angle that the next saccade encloses with the horizontal display border
+                The angle that the next saccade encloses with the 
+                horizontal display border
             length: float or int
                 The length of the next saccade
         """
@@ -197,7 +182,7 @@ class FixGen(AbstractSim):
         """
         Draws a new length- and angle-difference pair and calculates
         length and angle absolutes matching the last saccade drawn.
-        
+
         Parameters:
             prev_angle : float, optional
                 The last angle that was drawn in the current trajectory
@@ -209,14 +194,16 @@ class FixGen(AbstractSim):
         """
         
         if (prev_angle is None) or (prev_length is None):
-            (length, angle) = np.unravel_index(drawFrom(self.firstLengthsAngles_cumsum),
-                    self.firstLengthsAngles_shape)
-            angle = angle-((self.firstLengthsAngles_shape[1]-1)/2)
+            (length, angle)= np.unravel_index(drawFrom(self.firstLenAng_cumsum),
+                                                self.firstLenAng_shape)
+            angle = angle-((self.firstLenAng_shape[1]-1)/2)
         else:
-            J, I = np.unravel_index(drawFrom(self.probability_cumsum), self.full_H1.shape)
+            J, I = np.unravel_index(drawFrom(self.probability_cumsum), 
+                                    self.full_H1.shape)
             angle = reshift((I-self.full_H1.shape[1]/2) + prev_angle)
             self.drawn = np.append(self.drawn, J)
-            length = prev_length + ((J-self.full_H1.shape[0]/2)*self.fm.pixels_per_degree)
+            length = prev_length + \
+                    ((J-self.full_H1.shape[0]/2)*self.fm.pixels_per_degree)
         return angle, length
     
     def parameters(self):
@@ -237,14 +224,15 @@ class FixGen(AbstractSim):
         sample = []
 
         for s in xrange(0, num_samples):
-            for i, (xs,ys) in enumerate(self.sample()):
+            for i, (xs, ys) in enumerate(self.sample()):
                 x.append(xs)
                 y.append(ys)
                 fix.append(i+1)
                 sample.append(s)   
             
-        fields = {'fix':np.array(fix),'y':np.array(y), 'x':np.array(x)}
-        param = {'image_size':self.fm.image_size,'pixels_per_degree':self.fm.pixels_per_degree}
+        fields = {'fix':np.array(fix), 'y':np.array(y), 'x':np.array(x)}
+        param = {'image_size':self.fm.image_size,
+                'pixels_per_degree':self.fm.pixels_per_degree}
         out =  fixmat.VectorFixmatFactory(fields, param)
         return out
     
@@ -258,27 +246,29 @@ class FixGen(AbstractSim):
         angles = []
         coordinates = []
         fix = []
-        sample_size = int(round(drawFrom(self.trajectoryLengths_cumsum, borders=self.trajectoryLengths_borders)))
+        sample_size = int(round(drawFrom(self.trajLen_cumsum, 
+                            borders=self.trajLen_borders)))
         
         if (self.firstfixcentered == True):
-            coordinates.append([self.fm.image_size[1]/2,self.fm.image_size[0]/2])
+            coordinates.append([self.fm.image_size[1]/2, self.fm.image_size[0]/2])
         else:
-            K,L=(np.unravel_index(drawFrom(self.firstcoordinates_cumsum),[self.fm.image_size[0],self.fm.image_size[1]]))
-            coordinates.append([L,K])
+            K, L = (np.unravel_index(drawFrom(self.firstcoo_cumsum),
+                                [self.fm.image_size[0],self.fm.image_size[1]]))
+            coordinates.append([L, K])
         fix.append(1)
         while len(coordinates) < sample_size:
             if len(lenghts) == 0 and len(angles) == 0:          
-                angle, length = self._draw(self)                                                       
+                angle, length = self._draw(self)
             else:
-                angle, length = self._draw(prev_angle = angles[-1], prev_length = lenghts[-1])  
+                angle, length = self._draw(prev_angle = angles[-1], 
+                                            prev_length = lenghts[-1])  
                         
             x, y = self._calc_xy(coordinates[-1], angle, length) 
             
             if (length<0):
-                self.minusSaccades+=1
-                pass # Drawn saccade length not possible
+                self.minusSaccades += 1 # Drawn saccade length not possible
             else:
-                coordinates.append([x,y])
+                coordinates.append([x, y])
                 lenghts.append(length) 
                 angles.append(angle)
                 fix.append(fix[-1]+1)
@@ -321,21 +311,21 @@ def anglendiff(fm, roll = 1, return_abs=False):
     angles  = []
     
     for r in range(1, roll+1):
-        heights = (fm.y - np.roll(fm.y,r)).astype(float)
-        widths = (fm.x - np.roll(fm.x,r)).astype(float)
-        heights[fm.fix<=min(fm.fix)+r-1]=np.nan
-        widths[fm.fix<=min(fm.fix)+r-1]=np.nan
+        heights = (fm.y - np.roll(fm.y, r)).astype(float)
+        widths = (fm.x - np.roll(fm.x, r)).astype(float)
+        heights[fm.fix <= min(fm.fix)+r-1]=np.nan
+        widths[fm.fix <= min(fm.fix)+r-1]=np.nan
         
         lengths.append((widths**2+heights**2)**.5)
-        angles.append(np.degrees(np.arctan2(heights,widths)))
+        angles.append(np.degrees(np.arctan2(heights, widths)))
         
-        length_diffs.append(lengths[0] - np.roll(lengths[r-1],1))
+        length_diffs.append(lengths[0] - np.roll(lengths[r-1], 1))
         
         # -360: straight saccades, -180: return saccades, 0: straight saccades,
         # 180: return saccades, 360: no return saccades
-        angle_diffs.append(angles[0] - np.roll(angles[r-1],1))
+        angle_diffs.append(angles[0] - np.roll(angles[r-1], 1))
                 
-    if return_abs==True:
+    if return_abs == True:
         return angles, lengths, angle_diffs, length_diffs
         
     else:
@@ -361,11 +351,11 @@ def firstSacDist(fm):
                 The fixation data to be analysed
     
     """  
-    ang, len, ad, ld = anglendiff(fm, return_abs=True)
-    screen_diag = int(ceil((fm.image_size[0]**2+fm.image_size[1]**2)**0.5))
-    y_arg = len[0][np.roll(fm.fix==min(fm.fix),1)]
-    x_arg = reshift(ang[0][np.roll(fm.fix==min(fm.fix),1)])
-    bins = [range(screen_diag+1), np.linspace(-180.5,180.5,362)]
+    ang, leng, ad, ld = anglendiff(fm, return_abs=True)
+    screen_diag = int(ceil((fm.image_size[0]**2 + fm.image_size[1]**2)**0.5))
+    y_arg = leng[0][np.roll(fm.fix == min(fm.fix), 1)]
+    x_arg = reshift(ang[0][np.roll(fm.fix == min(fm.fix), 1)])
+    bins = [range(screen_diag+1), np.linspace(-180.5, 180.5, 362)]
     return makeHist(x_arg, y_arg, fit=None, bins = bins)
     
 def firstCooDist(fm):
@@ -378,11 +368,10 @@ def firstCooDist(fm):
                 The fixation data to be analysed
     
     """  
-    ind = fm.fix==min(fm.fix)
+    ind = fm.fix == min(fm.fix)
     y_arg = fm.y[ind]
     x_arg = fm.x[ind]
     bins = [range(fm.image_size[0]+1), range(fm.image_size[1]+1)]
-    K = makeHist(x_arg, y_arg, fit=None, bins = bins)
     return makeHist(x_arg, y_arg, fit=None, bins = bins)
 
     
@@ -396,8 +385,9 @@ def trajLenDist(fm):
                 The fixation data to be analysed
     
     """  
-    trajLen = np.roll(fm.fix,1)[fm.fix==min(fm.fix)]
-    val, borders = np.histogram(trajLen, bins=np.linspace(-0.5, max(trajLen)+0.5, max(trajLen)+2))
+    trajLen = np.roll(fm.fix, 1)[fm.fix == min(fm.fix)]
+    val, borders = np.histogram(trajLen, 
+                    bins=np.linspace(-0.5, max(trajLen)+0.5, max(trajLen)+2))
     cumsum = np.cumsum(val.astype(float) / val.sum())
     return cumsum, borders
     
@@ -441,7 +431,7 @@ def reshift(I):
     return ((I-180)%360)-180
 
 if __name__ == '__main__':
-    sim = FixSim('fixmat_photos.mat')
+    sim = FixGen('fixmat_photos.mat')
     #sim.set_path()
     simfm = sim.sample_many(num_samples=6263)
 
