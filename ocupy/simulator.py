@@ -1,13 +1,14 @@
-#!/usr/bin/env python
+
 """This module implements a generator of data 
 with given second-order dependencies"""
 
-from math import radians, ceil, cos, sin 
+from math import radians, ceil, floor, cos, sin 
 import random
 import ocupy
 from ocupy import fixmat
 import spline_base
 import numpy as np
+import pdb
 
 class AbstractSim(object):
     """
@@ -56,7 +57,7 @@ def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.spline_pdf):
         return makeHist(ad, ld, fit=fit, bins=[e_y, e_x])
 
 def makeHist(x_val, y_val, fit=spline_base.spline_pdf, 
-            bins=[np.linspace(-36.5,36.5,73),np.linspace(-180.5,180.5,362)]):
+            bins=[np.linspace(-36.5,36.5,73),np.linspace(-180.5,179.5,361)]):
     """
     Constructs a (fitted) histogram of the given data.
     
@@ -76,8 +77,9 @@ def makeHist(x_val, y_val, fit=spline_base.spline_pdf,
     x_val = x_val[~np.isnan(x_val)]
     
     samples = zip(y_val, x_val)
-    K = np.histogram2d(y_val, x_val, bins=bins)[0]
-    K = K / sum(sum(K))
+    #pdb.set_trace()
+    K, xedges, yedges = np.histogram2d(y_val, x_val, bins=bins)
+    K = K / K.sum()
     
     if (fit is None):
         return K
@@ -141,17 +143,33 @@ class FixGen(AbstractSim):
                 Where applicable, the distribution of angle and length
                 differences to replicate with dimensions [73,361]
         """
-        ad, ld = anglendiff(self.fm, roll=1) 
-                
-        if full_H1 is None:
-            self.full_H1 = makeAngLenHist(ad[0], ld[0]/self.fm.pixels_per_degree,
-                                    collapse=False, fit=fit)
+        a, l, ad, ld = anglendiff(self.fm, roll=1, return_abs = True) 
+        
+        samples = np.zeros([3, len(l[0])])
+        samples[0] = l[0]/45
+        samples[1] = np.roll(ld[0]/45,-1)
+        samples[2] = np.roll(ad[0],-1)
+        z = np.any(np.isnan(samples), axis=0)
+        samples = samples[:,~np.isnan(samples).any(0)]
+         
+        self.full_H1 = []
+        if full_H1 is None:    
+            for i in range(1,int(ceil(max(samples[0])))):
+                if (np.logical_and(samples[0]<=i, samples[0]>i-1).any() == True):
+                    self.full_H1.append(makeAngLenHist(samples[2][np.logical_and(samples[0]<=i,samples[0]>i-1)],
+                                                    samples[1][np.logical_and(samples[0]<=i, samples[0]>i-1)],
+                                                    collapse=False, fit=fit))
+                else:
+                    self.full_H1.append(np.array([]))
         else:
             self.full_H1 = full_H1
-        
+                
         self.firstLenAng_cumsum, self.firstLenAng_shape = (
                                         compute_cumsum(firstSacDist(self.fm)))
-        self.probability_cumsum = np.cumsum(self.full_H1.flat)
+        self.probability_cumsum = []
+       
+        for i in range(len(self.full_H1)):
+            self.probability_cumsum.append(np.cumsum(self.full_H1[i].flat))
         
         self.firstcoo_cumsum = compute_cumsum(firstCooDist(self.fm))[0]
         self.trajLen_cumsum, self.trajLen_borders = trajLenDist(self.fm)
@@ -198,12 +216,13 @@ class FixGen(AbstractSim):
                                                 self.firstLenAng_shape)
             angle = angle-((self.firstLenAng_shape[1]-1)/2)
         else:
-            J, I = np.unravel_index(drawFrom(self.probability_cumsum), 
-                                    self.full_H1.shape)
-            angle = reshift((I-self.full_H1.shape[1]/2) + prev_angle)
+            print prev_length
+            J, I = np.unravel_index(drawFrom(self.probability_cumsum[int(floor(prev_length/45))]), 
+                                    self.full_H1[int(floor(prev_length/45))].shape)
+            angle = reshift((I-self.full_H1[int(floor(prev_length/45))].shape[1]/2) + prev_angle)
             self.drawn = np.append(self.drawn, J)
             length = prev_length + \
-                    ((J-self.full_H1.shape[0]/2)*self.fm.pixels_per_degree)
+                    ((J-self.full_H1[int(floor(prev_length/45))].shape[0]/2)*self.fm.pixels_per_degree)
         return angle, length
     
     def parameters(self):
