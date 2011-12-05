@@ -9,6 +9,9 @@ from ocupy import fixmat
 import spline_base
 import numpy as np
 import pdb
+import cPickle
+from progressbar import ProgressBar, Percentage, Bar
+
 
 class AbstractSim(object):
     """
@@ -151,7 +154,8 @@ class FixGen(AbstractSim):
         samples[2] = np.roll(ad[0],-1)
         z = np.any(np.isnan(samples), axis=0)
         samples = samples[:,~np.isnan(samples).any(0)]
-         
+        cPickle.dump(samples,open('samples.dat','wb'))  
+            
         self.full_H1 = []
         if full_H1 is None:    
             for i in range(1,int(ceil(max(samples[0])))):
@@ -216,7 +220,8 @@ class FixGen(AbstractSim):
                                                 self.firstLenAng_shape)
             angle = angle-((self.firstLenAng_shape[1]-1)/2)
         else:
-            print prev_length
+            while not(self.probability_cumsum[int(floor(prev_length/45))]).any():
+                prev_length -= 1
             J, I = np.unravel_index(drawFrom(self.probability_cumsum[int(floor(prev_length/45))]), 
                                     self.full_H1[int(floor(prev_length/45))].shape)
             angle = reshift((I-self.full_H1[int(floor(prev_length/45))].shape[1]/2) + prev_angle)
@@ -241,13 +246,17 @@ class FixGen(AbstractSim):
         y = []
         fix = []
         sample = []
-
+        
+        # XXX: Delete ProgressBar
+        pbar = ProgressBar(widgets=[Percentage(),Bar()], maxval=num_samples).start()
+        
         for s in xrange(0, num_samples):
             for i, (xs, ys) in enumerate(self.sample()):
                 x.append(xs)
                 y.append(ys)
                 fix.append(i+1)
                 sample.append(s)   
+            pbar.update(s+1)
             
         fields = {'fix':np.array(fix), 'y':np.array(y), 'x':np.array(x)}
         param = {'image_size':self.fm.image_size,
