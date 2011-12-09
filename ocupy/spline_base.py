@@ -156,7 +156,7 @@ def knots_from_marginal(marginal, nr_knots, spline_order):
     cumsum = np.cumsum(marginal)
     cumsum = cumsum/cumsum.max()
     borders = np.linspace(0,1,nr_knots)
-    knot_placement = [0] + [np.where(cumsum>=b)[0][0] for b in borders[1:-1]] +[len(marginal)-1]
+    knot_placement = [0] + np.unique([np.where(cumsum>=b)[0][0] for b in borders[1:-1]]).tolist() +[len(marginal)-1]
     knots = augknt(knot_placement, spline_order)
     return knots
 
