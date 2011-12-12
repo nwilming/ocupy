@@ -150,19 +150,19 @@ class FixGen(AbstractSim):
         
         samples = np.zeros([3, len(l[0])])
         samples[0] = l[0]/45
-        samples[1] = np.roll(ld[0]/45,-1)
+        samples[1] = np.roll(l[0]/45,-1) 
         samples[2] = np.roll(ad[0],-1)
         z = np.any(np.isnan(samples), axis=0)
         samples = samples[:,~np.isnan(samples).any(0)]
-        cPickle.dump(samples,open('samples.dat','wb'))  
             
         self.full_H1 = []
         if full_H1 is None:    
-            for i in range(1,int(ceil(max(samples[0])))):
+            for i in range(1,ceil(((self.fm.image_size[0]**2+self.fm.image_size[1]**2)**.5)/45)):
                 if (np.logical_and(samples[0]<=i, samples[0]>i-1).any() == True):
-                    self.full_H1.append(makeAngLenHist(samples[2][np.logical_and(samples[0]<=i,samples[0]>i-1)],
+                    self.full_H1.append(makeHist(samples[2][np.logical_and(samples[0]<=i,samples[0]>i-1)],
                                                     samples[1][np.logical_and(samples[0]<=i, samples[0]>i-1)],
-                                                    collapse=False, fit=fit))
+                                                    fit=fit, bins=[np.linspace(-0.5,36.5,37),np.linspace(-180.5,179.5,361)]))
+
                 else:
                     self.full_H1.append(np.array([]))
         else:
@@ -220,14 +220,17 @@ class FixGen(AbstractSim):
                                                 self.firstLenAng_shape)
             angle = angle-((self.firstLenAng_shape[1]-1)/2)
         else:
-            while not(self.probability_cumsum[int(floor(prev_length/45))]).any():
-                prev_length -= 1
-            J, I = np.unravel_index(drawFrom(self.probability_cumsum[int(floor(prev_length/45))]), 
-                                    self.full_H1[int(floor(prev_length/45))].shape)
-            angle = reshift((I-self.full_H1[int(floor(prev_length/45))].shape[1]/2) + prev_angle)
+            ind = int(floor(prev_length/45))
+            while ind >= len(self.probability_cumsum):
+                ind -= 1
+
+            while not(self.probability_cumsum[ind]).any():
+                ind -= 1
+            J, I = np.unravel_index(drawFrom(self.probability_cumsum[ind]), 
+                                    self.full_H1[ind].shape)
+            angle = reshift((I-self.full_H1[ind].shape[1]/2) + prev_angle)
             self.drawn = np.append(self.drawn, J)
-            length = prev_length + \
-                    ((J-self.full_H1[int(floor(prev_length/45))].shape[0]/2)*self.fm.pixels_per_degree)
+            length = J*self.fm.pixels_per_degree
         return angle, length
     
     def parameters(self):
