@@ -11,17 +11,6 @@ import ocupy
 
 class TestSimulator(unittest.TestCase):
     
-    def test_init(self):
-        # XXX Beter use self generated data
-        fm = fixmat.FixmatFactory('/net/store/users/nwilming/eq/analysis/qoamp/fixmat_photos.mat')
-        gen = simulator.FixGen(fm)
-        self.assertTrue(type(gen.fm)==ocupy.fixmat.FixMat)
-        # In this data, the first fixation is deleted from the set
-        self.assertTrue(gen.firstfixcentered == True)
-        
-        fm.fix-=1
-        gen = simulator.FixGen(fm)
-        self.assertTrue(gen.firstfixcentered == False)
         
     def test_anglendiff(self):
         fm = fixmat.FixmatFactory('/net/store/users/nwilming/eq/analysis/qoamp/fixmat_photos.mat')
@@ -36,14 +25,14 @@ class TestSimulator(unittest.TestCase):
         
             # Create artificial fixmat with fixed angle differences
             for j in range(len(fm.x)-1):
-                coord.append(gen._calc_xy(coord[-1], cur_angle[-1], length))
+                coord.append(simulator.calc_xy(coord[-1], cur_angle[-1], length))
                 cur_angle.append(cur_angle[-1]+angle)
                 
             fm.x = np.array([x[0] for x in coord])
             fm.y = np.array([x[1] for x in coord])
             
             #XXX Parameter should be None, not "None"
-            gen.initializeData(fit='None')
+            gen.initialize_data(fit=None)
             
             # Use anglendiff to calculate angles and angle_diff
             a, l, ad, ld = simulator.anglendiff(fm, return_abs=True)
