@@ -1,41 +1,280 @@
 import numpy as np
-import scikits.statsmodels.api as sm
+from scikits.learn import linear_model
 
-def spline_fdm(fm,base_spec = None, spline_order = 3):
-    # Set up parameters in relation to image_size
-    if not base_spec:
-        height = np.round(fm.image_size[0] / (.5*fm.pixels_per_degree))
-        width = np.round(fm.image_size[1] /(.5*fm.pixels_per_degree))
-        nr_knots_x = 4#width/4
-        nr_knots_y = 4#height/4
+from utils import Memoize
+
+def fit3d(samples, e_x, e_y, e_z, remove_zeros = False, **kw):
+    """Fits a 3D distribution with splines.
+
+    Input:
+        samples: Array
+            Array of samples from a probability distribution
+        e_x: Array
+            Edges that define the events in the probability 
+            distribution along the x direction. For example, 
+            e_x[0] < samples[0] <= e_x[1] picks out all 
+            samples that are associated with the first event.
+        e_y: Array
+            See e_x, but for the y direction.
+        remove_zeros: Bool
+            If True, events that are not observed will not 
+            be part of the fitting process. If False, those 
+            events will be modelled as finfo('float').eps 
+        **kw: Arguments that are passed on to spline_bse1d.
+
+    Returns:
+        distribution: Array
+            An array that gives an estimate of probability for 
+            events defined by e.
+        knots: Tuple of arrays
+            Sequence of knots that were used for the spline basis (x,y) 
+    """
+    height, width, depth = len(e_y)-1, len(e_x)-1, len(e_z)-1 
+    
+    (p_est, _) = np.histogramdd(samples, (e_x, e_y, e_z))
+    p_est = p_est/sum(p_est.flat)
+    p_est = p_est.flatten()
+    if remove_zeros:
+        non_zero = ~(p_est == 0)
     else:
-        height, width, nr_knots_y, nr_knots_x = base_spec
-    # compute down scale factor
-    down_scale = float(height)/fm.image_size[0] 
-    # compute basis
-    #base = spline_base(height, width, nr_knots_x, nr_knots_y, spline_order)
-    # compute target histogram
-    # this specifies left edges of the histogram bins, i.e. fixations between
-    # ]0 binedge[0]] are included. --> fixations are ceiled
-    e_y = np.arange(0, height+1)
-    e_x = np.arange(0, width+1)
-    samples = np.array(zip((down_scale*fm.y), (down_scale*fm.x)))
-    return spline_pdf(samples,e_y,e_x)
+        non_zero = (p_est >= 0)
+    basis = spline_base3d(width,height, depth, **kw)
+    model = linear_model.BayesianRidge()
+    model.fit(basis[:, non_zero].T, p_est[:,np.newaxis][non_zero,:])
+    return (model.predict(basis.T).reshape((width, height, depth)), 
+                p_est.reshape((width, height, depth)))
+       
+       
+def fit2d(samples,e_x, e_y, remove_zeros = False, **kw):
+    """Fits a 2D distribution with splines.
 
-def spline_pdf(samples,e_y,e_x,base=None,nr_knots_x=3,nr_knots_y=3,hist=None):
+    Input:
+        samples: Matrix or list of arrays 
+            If matrix, it must be of size Nx2, where N is the number of
+            observations. If list, it must contain two arrays of length
+            N.
+        e_x: Array
+            Edges that define the events in the probability 
+            distribution along the x direction. For example, 
+            e_x[0] < samples[0] <= e_x[1] picks out all 
+            samples that are associated with the first event.
+        e_y: Array
+            See e_x, but for the y direction.
+        remove_zeros: Bool
+            If True, events that are not observed will not 
+            be part of the fitting process. If False, those 
+            events will be modelled as finfo('float').eps 
+        **kw: Arguments that are passed on to spline_bse1d.
+
+    Returns:
+        distribution: Array
+            An array that gives an estimate of probability for 
+            events defined by e.
+        knots: Tuple of arrays
+            Sequence of knots that were used for the spline basis (x,y) 
+    """
     height = len(e_y)-1
-    width = len(e_x)-1
-    if not base:
-        base = spline_base(height, width, nr_knots_x,nr_knots_y , 3)
-    if hist == None:
-        (hist, _) = np.histogramdd(samples, (e_y, e_x))
-    poiss_model = sm.Poisson(hist.reshape(-1,1), base.T)
-    results = poiss_model.fit(maxiter=100, method='bfgs')
-    big_base = spline_base(height*1,width,
-          nr_knots_x, nr_knots_y, 3)
-    #big_base = sm.add_constant(big_base.T)
-    return np.exp(np.dot(big_base.T,results.params)).reshape((1*height, width))
-   
+    width = len(e_x)-1   
+    (p_est, _) = np.histogramdd(samples, (e_x, e_y))
+    # p_est contains x in dim 1 and y in dim 0
+    shape = p_est.shape
+    p_est = (p_est/sum(p_est.flat)).reshape(shape)
+    mx =  p_est.sum(1)
+    my = p_est.sum(0)
+    # Transpose hist to have x in dim 0
+    p_est = p_est.T.flatten()
+    basis, knots = spline_base2d(width, height, marginal_x = mx, marginal_y = my, **kw)
+    model = linear_model.BayesianRidge()
+    if remove_zeros:
+        non_zero = ~(p_est == 0)
+        model.fit(basis[:, non_zero].T, p_est[:,np.newaxis][non_zero,:])
+    else:
+        non_zero = (p_est >= 0)
+        p_est[:,np.newaxis][~non_zero,:] = np.finfo(float).eps
+        model.fit(basis.T, p_est[:,np.newaxis])
+    return (model.predict(basis.T).reshape((height, width)), 
+            p_est.reshape((height, width)), knots)
+
+def fit1d(samples, e, remove_zeros = False, **kw):
+    """Fits a 1D distribution with splines.
+
+    Input:
+        samples: Array
+            Array of samples from a probability distribution
+        e: Array
+            Edges that define the events in the probability 
+            distribution. For example, e[0] < x <= e[1] is
+            the range of values that are associated with the
+            first event.
+        **kw: Arguments that are passed on to spline_bse1d.
+
+    Returns:
+        distribution: Array
+            An array that gives an estimate of probability for 
+            events defined by e.
+        knots: Array
+            Sequence of knots that were used for the spline basis
+    """
+    samples = samples[~np.isnan(samples)]
+    length = len(e)-1
+    hist,_ = np.histogramdd(samples, (e,))
+    hist = hist/sum(hist)
+    basis, knots = spline_base1d(length, marginal = hist, **kw)
+    non_zero = hist>0
+    model = linear_model.BayesianRidge()
+    if remove_zeros:
+        model.fit(basis[non_zero, :], hist[:,np.newaxis][non_zero,:])
+    else:
+        hist[~non_zero] = np.finfo(float).eps
+        model.fit(basis, hist[:,np.newaxis])
+    return model.predict(basis), hist, knots
+
+def knots_from_marginal(marginal, nr_knots, spline_order):
+    """
+    Determines knot placement based on a marginal distribution.  
+
+    It places knots such that each knot covers the same amount 
+    of probability mass. Two of the knots are reserved for the
+    borders which are treated seperatly. For example, a uniform
+    distribution with 5 knots will cause the knots to be equally 
+    spaced with 25% of the probability mass between each two 
+    knots.
+
+    Input:
+        marginal: Array
+            Estimate of the marginal distribution used to estimate
+            knot placement.
+        nr_knots: int
+            Number of knots to be placed.
+        spline_order: int 
+            Order of the splines
+
+    Returns:
+        knots: Array
+            Sequence of knot positions
+    """
+    cumsum = np.cumsum(marginal)
+    cumsum = cumsum/cumsum.max()
+    borders = np.linspace(0,1,nr_knots)
+    knot_placement = [0] + np.unique([np.where(cumsum>=b)[0][0] for b in borders[1:-1]]).tolist() +[len(marginal)-1]
+    knots = augknt(knot_placement, spline_order)
+    return knots
+
+@Memoize
+def spline_base1d(length, nr_knots = 20, spline_order = 5, marginal = None):
+    """Computes a 1D spline basis
+    
+    Input:
+        length: int
+            length  of each basis
+        nr_knots: int
+            Number of knots, i.e. number of basis functions.
+        spline_order: int
+            Order of the splines.
+        marginal: array, optional
+            Estimate of the marginal distribution of the input to be fitted. 
+            If given, it is used to determine the positioning of knots, each 
+            knot will cover the same amount of probability mass. If not given,
+            knots are equally spaced.
+    """
+    if marginal is None:
+        knots = augknt(np.linspace(0,length, nr_knots), spline_order)
+    else:
+        knots = knots_from_marginal(marginal, nr_knots, spline_order)
+        
+    x_eval = np.arange(1,length+1).astype(float)
+    Bsplines    = spcol(x_eval,knots,spline_order)
+    return Bsplines, knots
+
+@Memoize
+def spline_base2d(width, height, nr_knots_x = 20.0, nr_knots_y = 20.0, 
+        spline_order = 5, marginal_x = None, marginal_y = None):
+    """Computes a set of 2D spline basis functions. 
+    
+    The basis functions cover the entire space in height*width and can 
+    for example be used to create fixation density maps. 
+
+    Input:
+        width: int
+            width  of each basis
+        height: int 
+            height of each basis
+        nr_knots_x: int
+            of knots in x (width) direction.
+        nr_knots_y: int
+            of knots in y (height) direction.
+        spline_order: int
+            Order of the spline.
+        marginal_x: array, optional
+            Estimate of marginal distribution of the input to be fitted
+            along the x-direction (width). If given, it is used to determine 
+            the positioning of knots, each knot will cover the same amount 
+            of probability mass. If not given, knots are equally spaced.
+        marginal_y: array, optional
+            Marginal distribution along the y-direction (height). If
+            given, it is used to determine the positioning of knots.
+            Each knot will cover the same amount of probability mass.
+    Output:
+        basis: Matrix 
+            Matrix of size n*(width*height) that contains in each row
+            one vectorized basis. 
+        knots: Tuple 
+            (x,y) are knot arrays that show the placement of knots.
+    """
+    if not (nr_knots_x<width and nr_knots_y<height):
+        raise RuntimeError("Too many knots for size of the base")
+    if marginal_x is None:
+        knots_x         = augknt(np.linspace(0,width,nr_knots_x), spline_order)
+    else:
+        knots_x = knots_from_marginal(marginal_x, nr_knots_x, spline_order) 
+    if marginal_y is None:
+        knots_y         = augknt(np.linspace(0,height, nr_knots_y), spline_order)
+    else:
+        knots_y = knots_from_marginal(marginal_y, nr_knots_y, spline_order)
+    x_eval = np.arange(1,width+1).astype(float)
+    y_eval = np.arange(1,height+1).astype(float)    
+    spline_setx = spcol(x_eval, knots_x, spline_order)
+    spline_sety = spcol(y_eval, knots_y, spline_order)
+    nr_coeff = [spline_sety.shape[1], spline_setx.shape[1]]
+    dim_bspline = [nr_coeff[0]*nr_coeff[1], len(x_eval)*len(y_eval)]
+    # construct 2D B-splines 
+    nr_basis = 0
+    bspline = np.zeros(dim_bspline)
+    for IDX1 in range(0,nr_coeff[0]):
+        for IDX2 in range(0, nr_coeff[1]):
+            rand_coeff  = np.zeros((nr_coeff[0] , nr_coeff[1]))
+            rand_coeff[IDX1,IDX2] = 1
+            tmp = np.dot(spline_sety,rand_coeff)
+            bspline[nr_basis,:] = np.dot(tmp,spline_setx.T).reshape((1,-1))
+            nr_basis = nr_basis+1
+    return bspline, (knots_x, knots_y)
+
+def spline_base3d( width, height, depth, nr_knots_x = 10.0, nr_knots_y = 10.0,
+        nr_knots_z=10, spline_order = 3, marginal_x = None, marginal_y = None, 
+        marginal_z = None):
+    """Computes a set of 3D spline basis functions. 
+    
+    For a description of the parameters see spline_base2d.
+    """  
+    if not nr_knots_z < depth:
+        raise RuntimeError("Too many knots for size of the base")
+    basis2d, (knots_x, knots_y) = spline_base2d(height, width, nr_knots_x, 
+            nr_knots_y, spline_order, marginal_x, marginal_y)
+    if marginal_z is not None:
+        knots_z = knots_from_marginal(marginal_z, nr_knots_z, spline_order)
+    else:
+        knots_z = augknt(np.linspace(0,depth, nr_knots_z), spline_order)
+    z_eval = np.arange(1,depth+1).astype(float)
+    spline_setz = spcol(z_eval, knots_z, spline_order)
+    bspline = np.zeros((basis2d.shape[0]*len(z_eval), height*width*depth))
+    basis_nr = 0
+    for spline_a in spline_setz.T:
+        for spline_b in basis2d:
+            spline_b = spline_b.reshape((height, width))
+            bspline[basis_nr, :] = (spline_b[:,:,np.newaxis] * spline_a[:]).flat
+            basis_nr +=1
+    return bspline, (knots_x, knots_y, knots_z)
+
 def spline(x,knots,p,i=0.0):
     """Evaluates the ith spline basis given by knots on points in x"""
     assert(p+1<len(knots))
@@ -66,60 +305,12 @@ def spcol(x,knots,spline_order):
     
 def augknt(knots,order):
     """Augment knot sequence such that some boundary conditions 
-    are met. However, right now I have not really a clue why this
-    is needed."""
+    are met."""
     a = []
     [a.append(knots[0]) for t in range(0,order)]
     [a.append(k) for k in knots]
     [a.append(knots[-1]) for t in range(0,order)]
     return np.array(a)     
-
-def spline_base(height, width, Nr_Knots_x = 5.0, Nr_Knots_y = 5.0, 
-        spline_order = 3,scale_factor=None):
-    """Computes a set of 2D spline basis functions. 
-    
-    The basis functions cover the entire space in height*width and can 
-    for example be used to create fixation density maps. 
-
-    Input:
-        height: int
-            height of each basis
-        width: int 
-            widht of each basis
-        Nr_Knots_x: int
-            # of knots in x direction. These will be equally spaced
-        Nr_Knots_y: int
-            # of knots in y direction. These will be equally spaced
-        spline_order: int
-            Order of the spline.
-    Output:
-        bases: Matrix of size n*(width*height) that contains in each row
-            one vectorized basis.
-    """
-    Knots_x         = augknt(np.linspace(0,width,Nr_Knots_x),spline_order)
-    Knots_y         = augknt(np.linspace(0,height,Nr_Knots_y),spline_order)
-    if not scale_factor:
-        x_eval = np.arange(1,width+1).astype(float)
-        y_eval = np.arange(1,height+1).astype(float)
-    else:
-        x_eval = np.linspace(1,width, width*scale_factor)
-        y_eval = np.linspace(1,height, height*scale_factor)
-    spline_setx     = spcol(x_eval,Knots_x,spline_order)
-    spline_sety     = spcol(y_eval,Knots_y,spline_order)
-    Nr_coeff        = [spline_sety.shape[1], spline_setx.shape[1]]
-    DIM_Bspline     = [Nr_coeff[0]*Nr_coeff[1], len(x_eval)*len(y_eval)]
-    # construct 2D B-splines 
-    Nr_basis        = 0
-    Bspline         = np.zeros((DIM_Bspline[0],DIM_Bspline[1]))
-    for IDX1 in range(0,Nr_coeff[0]):
-        for IDX2 in range(0, Nr_coeff[1]):
-            Rand_coeff      = np.zeros((Nr_coeff[0],Nr_coeff[1]))
-            Rand_coeff[IDX1,IDX2] = 1
-            tmp = np.dot(spline_sety,Rand_coeff)
-            Bspline[Nr_basis,:]     = np.dot(tmp,spline_setx.T).reshape((1,-1))
-            Nr_basis                = Nr_basis+1
-    return Bspline
-
 
 def N(u,i,p,knots):
     """Compute Spline Basis
