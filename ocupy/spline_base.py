@@ -45,7 +45,7 @@ def fit3d(samples, e_x, e_y, e_z, remove_zeros = False, **kw):
                 p_est.reshape((width, height, depth)))
        
        
-def fit2d(samples,e_x, e_y, remove_zeros = False, **kw):
+def fit2d(samples,e_x, e_y, remove_zeros = False, p_est = None,  **kw):
     """Fits a 2D distribution with splines.
 
     Input:
@@ -73,9 +73,13 @@ def fit2d(samples,e_x, e_y, remove_zeros = False, **kw):
         knots: Tuple of arrays
             Sequence of knots that were used for the spline basis (x,y) 
     """
-    height = len(e_y)-1
-    width = len(e_x)-1   
-    (p_est, _) = np.histogramdd(samples, (e_x, e_y))
+    if p_est is None:
+        height = len(e_y)-1
+        width = len(e_x)-1   
+        (p_est, _) = np.histogramdd(samples, (e_x, e_y))
+    else:
+        p_est = p_est.T
+        width, height = p_est.shape
     # p_est contains x in dim 1 and y in dim 0
     shape = p_est.shape
     p_est = (p_est/sum(p_est.flat)).reshape(shape)
