@@ -146,22 +146,23 @@ class FixGen(AbstractSim):
                 Where applicable, the distribution of angle and length
                 differences to replicate with dimensions [73,361]
         """
-        a, l, ad, ld = anglendiff(self.fm, roll=1, return_abs = True) 
+        a, l, ad, ld = anglendiff(self.fm, roll=1, return_abs = True)
         
         samples = np.zeros([3, len(l[0])])
         samples[0] = l[0]/45
-        samples[1] = np.roll(l[0]/45,-1) 
-        samples[2] = np.roll(ad[0],-1)
+        samples[1] = np.roll(l[0]/45,-1)
+        samples[2] = np.roll(reshift(ad[0]),-1)
         z = np.any(np.isnan(samples), axis=0)
         samples = samples[:,~np.isnan(samples).any(0)]
             
-        self.full_H1 = []
-        if full_H1 is None:    
-            for i in range(1,ceil(((self.fm.image_size[0]**2+self.fm.image_size[1]**2)**.5)/45)):
-                if (np.logical_and(samples[0]<=i, samples[0]>i-1).any() == True):
-                    self.full_H1.append(makeHist(samples[2][np.logical_and(samples[0]<=i,samples[0]>i-1)],
-                                                    samples[1][np.logical_and(samples[0]<=i, samples[0]>i-1)],
-                                                    fit=fit, bins=[np.linspace(-0.5,36.5,37),np.linspace(-180.5,179.5,361)]))
+        
+        if full_H1 is None:   
+            self.full_H1 = []
+            for i in range(1, int(ceil(((self.fm.image_size[0]**2+self.fm.image_size[1]**2)**.5)/45))):
+                idx = np.logical_and(samples[0]<=i, samples[0]>i-1)
+                if idx.any() == True:
+                    self.full_H1.append(makeHist(samples[2][idx], samples[1][idx], fit=fit, 
+                                                bins=[np.linspace(-0.5,36.5,38),np.linspace(-180.5,179.5,361)]))
 
                 else:
                     self.full_H1.append(np.array([]))
@@ -170,10 +171,17 @@ class FixGen(AbstractSim):
                 
         self.firstLenAng_cumsum, self.firstLenAng_shape = (
                                         compute_cumsum(firstSacDist(self.fm)))
+        self.firstLenAng_cumsum, self.firstLenAng_shape = (
+                                        compute_cumsum(np.ones((35,361))/(np.ones((35,361))).sum()))
+                                        
+        print firstSacDist(self.fm).shape                                       
         self.probability_cumsum = []
        
         for i in range(len(self.full_H1)):
-            self.probability_cumsum.append(np.cumsum(self.full_H1[i].flat))
+            if self.full_H1[i] == []:
+                self.probability_cumsum.append(np.array([]))
+            else:
+                self.probability_cumsum.append(np.cumsum(self.full_H1[i].flat))
         
         self.firstcoo_cumsum = compute_cumsum(firstCooDist(self.fm))[0]
         self.trajLen_cumsum, self.trajLen_borders = trajLenDist(self.fm)
@@ -223,13 +231,18 @@ class FixGen(AbstractSim):
             ind = int(floor(prev_length/45))
             while ind >= len(self.probability_cumsum):
                 ind -= 1
+                #pdb.set_trace()
 
             while not(self.probability_cumsum[ind]).any():
                 ind -= 1
+                #pdb.set_trace()
+                
             J, I = np.unravel_index(drawFrom(self.probability_cumsum[ind]), 
                                     self.full_H1[ind].shape)
             angle = reshift((I-self.full_H1[ind].shape[1]/2) + prev_angle)
-            self.drawn = np.append(self.drawn, J)
+            #self.drawn.append((I,angle))
+            #import pylab as pp
+            #pp.plot(self.probability_cumsum[ind])
             length = J*self.fm.pixels_per_degree
         return angle, length
     
@@ -383,8 +396,8 @@ def firstSacDist(fm):
     
     """  
     ang, leng, ad, ld = anglendiff(fm, return_abs=True)
-    screen_diag = int(ceil((fm.image_size[0]**2 + fm.image_size[1]**2)**0.5))
-    y_arg = leng[0][np.roll(fm.fix == min(fm.fix), 1)]
+    screen_diag = int(ceil((fm.image_size[0]**2 + fm.image_size[1]**2)**0.5))/fm.pixels_per_degree
+    y_arg = leng[0][np.roll(fm.fix == min(fm.fix), 1)]/fm.pixels_per_degree
     x_arg = reshift(ang[0][np.roll(fm.fix == min(fm.fix), 1)])
     bins = [range(screen_diag+1), np.linspace(-180.5, 180.5, 362)]
     return makeHist(x_arg, y_arg, fit=None, bins = bins)
