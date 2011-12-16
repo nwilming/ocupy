@@ -1,5 +1,8 @@
 import numpy as np
-from scikits.learn import linear_model
+try:
+    from sklearn import linear_model
+except ImportError:
+    from scikits.learn import linear_model
 
 from utils import Memoize
 
@@ -91,11 +94,11 @@ def fit2d(samples,e_x, e_y, remove_zeros = False, p_est = None,  **kw):
     model = linear_model.BayesianRidge()
     if remove_zeros:
         non_zero = ~(p_est == 0)
-        model.fit(basis[:, non_zero].T, p_est[:,np.newaxis][non_zero,:])
+        model.fit(basis[:, non_zero].T, p_est[non_zero])
     else:
         non_zero = (p_est >= 0)
-        p_est[:,np.newaxis][~non_zero,:] = np.finfo(float).eps
-        model.fit(basis.T, p_est[:,np.newaxis])
+        p_est[~non_zero,:] = np.finfo(float).eps
+        model.fit(basis.T, p_est)
     return (model.predict(basis.T).reshape((height, width)), 
             p_est.reshape((height, width)), knots)
 
