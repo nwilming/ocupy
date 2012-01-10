@@ -118,3 +118,4 @@ def spline(ad,ld,collapse=True,xdim=[-36,36]):
         H = spline_base.spline_pdf(np.array(samples), e_y, e_x, 
                 nr_knots_y = 3, nr_knots_x = 19)
     return H/H.sum()
+
