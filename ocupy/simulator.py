@@ -24,7 +24,7 @@ class AbstractSim(object):
     def parameters(self):
         raise NotImplementedError
 
-def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.spline_pdf):
+def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.fit2d):
     """
     Histograms and performs a spline fit on the given data, 
     usually angle and length differences.
@@ -59,7 +59,7 @@ def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.spline_pdf):
         ad[ad > 179.5] -= 360
         return makeHist(ad, ld, fit=fit, bins=[e_y, e_x])
 
-def makeHist(x_val, y_val, fit=spline_base.spline_pdf, 
+def makeHist(x_val, y_val, fit=spline_base.fit2d, 
             bins=[np.linspace(-36.5,36.5,73),np.linspace(-180.5,179.5,361)]):
     """
     Constructs a (fitted) histogram of the given data.
@@ -89,8 +89,7 @@ def makeHist(x_val, y_val, fit=spline_base.spline_pdf,
     
     # Check if given attr is a function
     elif hasattr(fit, '__call__'):
-        H = fit(np.array(samples), bins[0], bins[1], 
-                nr_knots_y = 4, nr_knots_x = 10, hist=K)
+        H = fit(np.array(samples), bins[0], bins[1], p_est=K)[0]
         return H/H.sum()
         
     else:
@@ -132,9 +131,10 @@ class FixGen(AbstractSim):
             raise TypeError("Not a valid argument, insert fixmat")
 
         self.firstfixcentered = firstfixcentered
+        self.nosamples = []
                     
         
-    def initializeData(self, fit=spline_base.spline_pdf, full_H1=None):
+    def initializeData(self, fit=spline_base.fit2d, full_H1=None):
         """
         Prepares the data to be replicated. Calculates the second-order length and angle
         dependencies between saccades and stores them in a fitted histogram.
@@ -158,14 +158,17 @@ class FixGen(AbstractSim):
         
         if full_H1 is None:   
             self.full_H1 = []
-            for i in range(1, int(ceil(((self.fm.image_size[0]**2+self.fm.image_size[1]**2)**.5)/45))):
+            screen_diag = ((self.fm.image_size[0]**2+self.fm.image_size[1]**2)**.5)/45
+            for i in range(1, int(ceil(screen_diag))):
                 idx = np.logical_and(samples[0]<=i, samples[0]>i-1)
                 if idx.any() == True:
                     self.full_H1.append(makeHist(samples[2][idx], samples[1][idx], fit=fit, 
                                                 bins=[np.linspace(-0.5,36.5,38),np.linspace(-180.5,179.5,361)]))
-
+    
+                    self.nosamples.append(len(samples[2][idx]))
                 else:
                     self.full_H1.append(np.array([]))
+                    self.nosamples.append([0])
         else:
             self.full_H1 = full_H1
                 
