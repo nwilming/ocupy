@@ -52,7 +52,12 @@ def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.fit2d):
     if collapse:
         e_y = np.linspace(-36.5, 36.5, 74)
         e_x = np.linspace(-0.5, 180.5, 182)
-        return makeHist(abs(ad), ld, fit=fit, bins=[e_y, e_x])
+        H = makeHist(abs(ad), ld, fit=fit, bins=[e_y, e_x])
+        '''
+        H[:,0]*=2  
+        H[:,-1]*=2
+        '''
+        return H
     else:
         e_x = np.linspace(-180.5, 179.5, 361)
         e_y = np.linspace(-36.5, 36.5, 74)
@@ -60,7 +65,7 @@ def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.fit2d):
         return makeHist(ad, ld, fit=fit, bins=[e_y, e_x])
 
 def makeHist(x_val, y_val, fit=spline_base.fit2d, 
-            bins=[np.linspace(-36.5,36.5,73),np.linspace(-180.5,179.5,361)]):
+            bins=[np.linspace(-36.5,36.5,74),np.linspace(-180.5,180.5,362)]):
     """
     Constructs a (fitted) histogram of the given data.
     
@@ -82,8 +87,12 @@ def makeHist(x_val, y_val, fit=spline_base.fit2d,
     samples = zip(y_val, x_val)
     #pdb.set_trace()
     K, xedges, yedges = np.histogram2d(y_val, x_val, bins=bins)
+    '''
+    K[:,0]*=2  
+    K[:,-1]*=2  
+    '''
     K = K / K.sum()
-    
+
     if (fit is None):
         return K
     
@@ -132,6 +141,7 @@ class FixGen(AbstractSim):
 
         self.firstfixcentered = firstfixcentered
         self.nosamples = []
+        self.noDist = 0
                     
         
     def initializeData(self, fit=spline_base.fit2d, full_H1=None):
@@ -163,7 +173,7 @@ class FixGen(AbstractSim):
                 idx = np.logical_and(samples[0]<=i, samples[0]>i-1)
                 if idx.any() == True:
                     self.full_H1.append(makeHist(samples[2][idx], samples[1][idx], fit=fit, 
-                                                bins=[np.linspace(-0.5,36.5,38),np.linspace(-180.5,179.5,361)]))
+                                                bins=[np.linspace(-0.5,36.5,38),np.linspace(-180.5,180.5,362)]))
     
                     self.nosamples.append(len(samples[2][idx]))
                 else:
@@ -174,9 +184,7 @@ class FixGen(AbstractSim):
                 
         self.firstLenAng_cumsum, self.firstLenAng_shape = (
                                         compute_cumsum(firstSacDist(self.fm)))
-        self.firstLenAng_cumsum, self.firstLenAng_shape = (
-                                        compute_cumsum(np.ones((35,361))/(np.ones((35,361))).sum()))
-                                        
+                                           
         print firstSacDist(self.fm).shape                                       
         self.probability_cumsum = []
        
@@ -192,7 +200,11 @@ class FixGen(AbstractSim):
         # Counters for saccades that have to be canceled during the process
         self.canceled = 0
         self.minusSaccades = 0
-        self.drawn = []
+        self.drawnAngDiff = []  # XXX: DELETE UNUSED VARS
+        self.drawnAng = []
+        self.drawnLen = []
+        self.firstLen = []
+        self.firstAng = []
         
         
     def _calc_xy(self, (x, y), angle, length):
@@ -229,24 +241,33 @@ class FixGen(AbstractSim):
         if (prev_angle is None) or (prev_length is None):
             (length, angle)= np.unravel_index(drawFrom(self.firstLenAng_cumsum),
                                                 self.firstLenAng_shape)
-            angle = angle-((self.firstLenAng_shape[1]-1)/2)
+            angle = angle-180  # XXX: ADJUST
+            self.firstAng.append(angle) # XXX: DELETE
+            #angle = angle-((self.firstLenAng_shape[1]-1)/2) 
+            length+=0.5
+            length*=self.fm.pixels_per_degree
+            self.firstLen.append(length)  # XXX: DELETE
         else:
             ind = int(floor(prev_length/45))
             while ind >= len(self.probability_cumsum):
                 ind -= 1
-                #pdb.set_trace()
+                self.noDist += 1
 
             while not(self.probability_cumsum[ind]).any():
                 ind -= 1
-                #pdb.set_trace()
+                self.noDist += 1
                 
             J, I = np.unravel_index(drawFrom(self.probability_cumsum[ind]), 
                                     self.full_H1[ind].shape)
-            angle = reshift((I-self.full_H1[ind].shape[1]/2) + prev_angle)
-            #self.drawn.append((I,angle))
+            angle = reshift((I-180)+prev_angle)  # XXX: Make more general (see line below)
+            #angle = reshift((I-self.full_H1[ind].shape[1]/2) + prev_angle)
+            self.drawnAngDiff.append(I)
+            self.drawnAng.append(angle)
             #import pylab as pp
             #pp.plot(self.probability_cumsum[ind])
-            length = J*self.fm.pixels_per_degree
+            length = J+0.5
+            length *= self.fm.pixels_per_degree
+            self.drawnLen.append(length)
         return angle, length
     
     def parameters(self):
@@ -274,7 +295,7 @@ class FixGen(AbstractSim):
                 x.append(xs)
                 y.append(ys)
                 fix.append(i+1)
-                sample.append(s)   
+                sample.append(s)
             pbar.update(s+1)
             
         fields = {'fix':np.array(fix), 'y':np.array(y), 'x':np.array(x)}
@@ -475,6 +496,14 @@ def reshift(I):
     # Output -180 to +180
     if type(I)==list:
         I = np.array(I)
+    '''
+    if type(I)==np.ndarray:    
+        I[np.logical_or(I<-180.5, I>180.5)]  = (((I[np.logical_or(I<-180.5, I>180.5)])-180)%360)-180
+    if type(I)==int or type(I)==float:
+        if np.logical_or(I<-180.5, I>180.5):
+            I = ((I-180)%360)-180
+    '''
+    
     return ((I-180)%360)-180
 
 if __name__ == '__main__':
