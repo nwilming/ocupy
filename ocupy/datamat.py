@@ -13,39 +13,44 @@ import h5py
 
 class DataMat(object):
     """
-    Represents data. 
-    The datamat object presents the fixation data as lists of values to the 
-    user. In general fixation data consists of fixations that have several
-    attributes. A fixation for example has a x and y position, but is also
+    Represents blocked data.
+    The datamat object presents data, essentially, as discrete blocks. Each block
+    is associated with attributes such as a subject's name or a trial condition.
+    
+    DataMat was FixMat, and so the typical 'block' of data is a fixation.
+     
+    A DataMat consists of lists called 'fields' which represent the raw
+    underlying data and its attributes.
+    
+    A fixation, for example, has an x and a y position, but is also
     associated with the image that was being viewed while the fixation
-    was made. The data can be accessed as attributes of the datamat::
+    was made. The data can be accessed as attributes of the DataMat:
 
         >>> datamat.x    # Returns a list of x-coordinates
         >>> datamat.y    # Returns a list of y-coordinates
 
-    In this case a single index into anyone of these lists represents a 
+    In this case a single index into any one of these lists represents a 
     fixation:
 
         >>> (datamat.x[0], datamat.y[0])  
 
-
-    .. note:: It is never neccessary to create a DataMat object directly. 
+    .. note:: It is never necessary to create a DataMat object directly. 
         This is handled by datamat factories.
 
     """ 
     
     def __init__(self, categories = None, datamat = None, index = None):
         """
-        Creates a new datamat from an existing one
+        Creates a new DataMat from an existing one
 
         Parameters:
             categories : optional, instance of stimuli.Categories,
-                allows direct access to image data via the datamat
+                allows direct access to image data via the DataMat
             datamat : instance of datamat.DataMat, optional
-                if given, the existing datamat is copied and only thos fixations
+                if given, the existing DataMat is copied and only those fixations
                 that are marked True in index are retained.
-            index : list of True or False, same length as fields of datamat
-                Indicates which fixations should be used for the new datamat and
+            index : list of True or False, same length as fields of DataMat
+                Indicates which blocks should be used for the new DataMat and
                 which should be ignored
         """
         self._subjects = []
@@ -65,9 +70,12 @@ class DataMat(object):
                 self.__dict__[param] = value
                 self._parameters[param] = self.__dict__[param]
             self._num_fix = index.sum()
-    
+
+    def __repr__(self):
+        return 'DataMat(%s elements)' % (self._num_fix)
+
     def __str__(self):
-        desc = "DataMat with %i fixations and the following data fields:\n" % (
+        desc = "DataMat with %i blocks and the following data fields:\n" % (
                                                                     self._num_fix)
         desc += "%s | %s | %s | %s \n" % ('Field Name'.rjust(20),
                                           'Length'.center(13), 
@@ -94,14 +102,14 @@ class DataMat(object):
    
     def __getitem__(self, key):
         """
-        Returns a filtered datamat which only includes fixation that are
+        Returns a filtered DataMat which only includes elements that are
         allowed by index 
         
 		
         Parameters:
             index : numpy array
-                A logical array that is True for fixations that are in 
-                the returned datamat and False for fixations that are 
+                A logical array that is True for elements that are in 
+                the returned DataMat and False for elements that are 
                 excluded.
         
         Notes:
@@ -112,7 +120,7 @@ class DataMat(object):
         #else:
         return self.filter(key)
             
-    def filter(self, index):
+    def filter(self, index): #@ReservedAssignment
         """
         Filters a datamat by different aspects.
         
@@ -701,7 +709,7 @@ def VectorFactory(fields, parameters, categories = None):
         fm.__dict__[field] = value 
     fm._parameters = parameters
     fm._subjects = None
-    for (field, value) in parameters.iteritems(): 
-       fm.__dict__[field] = value
+    for (field, value) in parameters.iteritems():
+        fm.__dict__[field] = value
     fm._num_fix = len(fm.__dict__[fields.keys()[0]])
     return fm
