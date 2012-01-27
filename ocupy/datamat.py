@@ -59,24 +59,34 @@ class DataMat(object):
             index : list of True or False, same length as fields of DataMat
                 Indicates which blocks should be used for the new DataMat and
                 which should be ignored
+        TODO: thoroughly test that all indices work as expected (including slicing etc)
         """
         self._subjects = []
         self._fields = []
         self._categories = categories
         self._parameters = {}
         if datamat is not None and index is not None:
-            index = index.reshape(-1,).astype(bool)
-            assert index.shape[0] == datamat._num_fix, ("Index vector for " +
-                "filtering has to have the same length as the fields of the datamat")
+            #index = index.reshape(-1,).astype(bool)
+            #assert index.shape[0] == datamat._num_fix, ("Index vector for " +
+            #    "filtering has to have the same length as the fields of the DataMat")
+            #TODO: check this for slicing operations (fields will be views
+            #rather than separate objects.
+            if not isiterable(index):
+                index = [index]
             self._subjects = datamat._subjects
             self._fields = datamat._fields
             for  field in self._fields:
-                self.__dict__[field] = datamat.__dict__[field][index]
+                newfield = datamat.__dict__[field][index]
+                num_fix = len(newfield)
+                self.__dict__[field] = newfield
             self._parameters = datamat._parameters
             for (param, value) in datamat._parameters.iteritems():
                 self.__dict__[param] = value
                 self._parameters[param] = self.__dict__[param]
-            self._num_fix = index.sum()
+            self._num_fix = num_fix
+    
+    def __len__(self):
+        return self._num_fix
 
     def __repr__(self):
         return 'DataMat(%s elements)' % (self._num_fix)
@@ -287,32 +297,82 @@ class DataMat(object):
         self._fields.remove(name)
         del self.__dict__[name]
 
+    def add_parameter(self, name, value):
+        """
+        Adds a parameter to the existing DataMat.
+        
+        Fails if parameter with same name already exists or if name is otherwise
+        in this objects ___dict__ dictionary.
+        
+        Added by rmuil on 2012/01/26
+        """
+        if self._parameters.has_key(name):
+            raise ValueError("'%s' is already a parameter" % (name))
+        elif self.__dict__.has_key(name):
+            raise ValueError("'%s' conflicts with the DataMat name-space" % (name))
+        
+        self.__dict__[name] = value
+        self._parameters[name] = self.__dict__[name]
+
+    def rm_parameter(self, name):
+        """
+        Removes a parameter to the existing DataMat.
+        
+        Fails if parameter doesn't exist.
+        
+        Added by rmuil on 2012/01/26
+        """
+        if not self._parameters.has_key(name):
+            raise ValueError("no '%s' parameter found" % (name))
+
+        del self._parameters[name]
+        del self.__dict__[name]
+        
+    def parameter_to_field(self, name):
+        """
+        Promotes a parameter to a field by creating a new array of same
+        size as the other existing fields, filling it with the current
+        value of the parameter, and then removing that parameter.
+        
+        Added by rmuil on 2012/01/26
+        """
+        if not self._parameters.has_key(name):
+            raise ValueError("no '%s' parameter found" % (name))
+        if self._fields.count(name) > 0:
+            raise ValueError("field with name '%s' already exists" % (name))
+        
+        data = np.array([self._parameters[name]]*self._num_fix)
+
+        self.rm_parameter(name)
+        self.add_field(name, data)
+        
     def join(self, fm_new):
         """
-        Adds content of a new datamat to this datamat.
+        Adds content of a new DataMat to this DataMat.
         
-        If the two datamats have different fields the minimal subset of both 
-        are present after the join. Parameters of the datamats must be the 
-        same.
+        If the two DataMats have different fields the minimal subset of both 
+        are present after the join.
+        
+        If a parameter of the DataMats is not equal, it is promoted into a field.
  
         Parameters
-        fm_new : Instance of DataMat
-            This datamat is added to the current one. Can only contain data
-            from one subject.
+        fm_new : instance of DataMat
+            This DataMat is added to the current one.
 
         """
-        # Check if new datamat has only data from one subject
-        if not len(np.unique(fm_new.SUBJECTINDEX))==1:
-            raise (RuntimeError(
-                """Can only join datamats if new datamat has data from only 
-                one subject"""))
-        
-        # Check if parameters are equal
-        #for ((n_cu, v_cu), (_, v_all)) in zip(fm_new._parameters.iteritems(),
-        #                                        self._parameters.iteritems()):
-        #    if not v_cu == v_all:
-        #        raise (RuntimeError("""Parameter %s has value %s in current and
-        #             value %s in new datamat""" %(n_cu, str(v_all), str(v_cu))))
+        # Check if parameters are equal. If not, promote them to fields.
+        for (nm, val) in self._parameters.items():
+            if fm_new._parameters.has_key(nm) and (val != fm_new._parameters[nm]):
+                print "debug: promoting parameter '%s' to field in both DataMats..." % (nm)
+                self.parameter_to_field(nm)
+                fm_new.parameter_to_field(nm)
+            elif nm in fm_new._fields:
+                print "debug: promoting parameter '%s' to field in first DataMat..." % (nm)
+                self.parameter_to_field(nm)
+        for (nm, val) in fm_new._parameters.items():
+            if nm in self._fields:
+                print "debug: promoting parameter '%s' to field in second DataMat..." % (nm)
+                fm_new.parameter_to_field(nm)
 
         # Check if same fields are present, if not only use minimal subset
         new_fields = []
@@ -327,9 +387,9 @@ class DataMat(object):
         self._fields = new_fields
         # Subjectindices must be unique, if indices in f_current are contained
         # in f_all set them to an arbitrary number
-        if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
-            fm_new.SUBJECTINDEX = np.ones(fm_new.SUBJECTINDEX.shape) * \
-            (max(self.SUBJECTINDEX)+1)
+        #if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
+        #    fm_new.SUBJECTINDEX = np.ones(fm_new.SUBJECTINDEX.shape) * \
+        #    (max(self.SUBJECTINDEX)+1)
         
         # Concatenate fields
         for field in self._fields:

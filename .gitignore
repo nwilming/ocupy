@@ -1,0 +1,7 @@
+*.pyc
+*~
+.*.swp
+
+#Some eclipse stuff we don't want to preserve
+.project
+.pydevproject
