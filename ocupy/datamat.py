@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""This module implements the DataMat Structure for managing eye-tracking data."""
+"""This module implements the DataMat Structure for managing blocked data."""
 
 from os.path import join
 from warnings import warn
@@ -11,10 +11,17 @@ from scipy.ndimage.filters import gaussian_filter
 
 import h5py
 
+def isiterable(some_object):
+    try:
+        iter(some_object)
+    except TypeError:
+        return False
+    return True
+
 class DataMat(object):
     """
     Represents blocked data.
-    The datamat object presents data, essentially, as discrete blocks. Each block
+    The DataMat object presents data, essentially, as discrete blocks. Each block
     is associated with attributes such as a subject's name or a trial condition.
     
     DataMat was FixMat, and so the typical 'block' of data is a fixation.
@@ -35,7 +42,7 @@ class DataMat(object):
         >>> (datamat.x[0], datamat.y[0])  
 
     .. note:: It is never necessary to create a DataMat object directly. 
-        This is handled by datamat factories.
+        This is handled by DataMat factories.
 
     """ 
     
@@ -122,9 +129,9 @@ class DataMat(object):
             
     def filter(self, index): #@ReservedAssignment
         """
-        Filters a datamat by different aspects.
+        Filters a DataMat by different aspects.
         
-        This function is a device to filter the datamat by certain logical 
+        This function is a device to filter the DataMat by certain logical 
         conditions. It takes as input a logical array (contains only True
         or False for every fixation) and kicks out all fixations for which
         the array says False. The logical array can conveniently be created
@@ -138,7 +145,7 @@ class DataMat(object):
     
         Parameters:
             index : array
-                Array-like that contains True for every fixtation that
+                Array-like that contains True for every element that
                 passes the filter; else contains False
         Returns:
             datamat : DataMat Instance
@@ -157,12 +164,12 @@ class DataMat(object):
         try:
             return self.__dict__[fieldname]
         except KeyError:
-            raise ValueError('%s is not a field or parameter of the datamat'
+            raise ValueError('%s is not a field or parameter of the DataMat'
                     % fieldname)
             
     def save(self, path):
         """
-        Saves datamat to path.
+        Saves DataMat to path.
         
         Parameters:
             path : string   
@@ -179,7 +186,7 @@ class DataMat(object):
                 
     def fieldnames(self):
         """
-        Returns a list of data fields that are present in the datamat.
+        Returns a list of data fields that are present in the DataMat.
         """
         return self._fields
             
@@ -188,7 +195,7 @@ class DataMat(object):
         Return a list of parameters that are available. 
         
         .. note::Parameters refer to things like 'image_size', 'pixels_per_degree', 
-            i.e. values that are valid for the entire datamat.
+            i.e. values that are valid for the entire DataMat.
         """
         return self._parameters
                             
@@ -336,14 +343,14 @@ class DataMat(object):
     def add_feature_values(self, features):
         """
         Adds feature values of feature 'feature' to all fixations in 
-        the calling datamat.
+        the calling DataMat.
         
         For fixations out of the image boundaries, NaNs are returned.
         The function generates a new attribute field named with the
         string in features that contains an np.array listing feature
-        values for every fixation in the datamat.
+        values for every fixation in the DataMat.
         
-        .. note:: The calling datamat must have been constructed with an 
+        .. note:: The calling DataMat must have been constructed with an 
         stimuli.Categories object
         
         Parameters:
@@ -356,9 +363,9 @@ class DataMat(object):
  
         if not self._categories:
             raise RuntimeError(
-            '''"%s" does not exist as a fieldname and the
-            datamat does not have a Categories object (no features 
-            available. The datamat has these fields: %s''' \
+            '''"%s" does not exist as a field and the
+            DataMat does not have a Categories object (no features 
+            available. The DataMat has these fields: %s''' \
             %(features, str(self._fields))) 
         for feature in features:
             # initialize new field with NaNs
@@ -381,7 +388,7 @@ class DataMat(object):
         Generates two M x N matrices with M feature values at fixations for 
         N features. Controls are a random sample out of all non-fixated regions 
         of an image or fixations of the same subject group on a randomly chosen 
-        image. Fixations are pooled over all subjects in the calling datamat.
+        image. Fixations are pooled over all subjects in the calling DataMat.
        
         Parameters : 
             all_controls : bool
@@ -480,7 +487,7 @@ def load(path):
 
 def compute_fdm(datamat, fwhm=2, scale_factor=1):
     """
-    Computes a fixation density map for the calling datamat. 
+    Computes a fixation density map for the calling DataMat. 
     
     Creates a map the size of the image fixations were recorded on.  
     Every pixel contains the frequency of fixations
@@ -488,7 +495,7 @@ def compute_fdm(datamat, fwhm=2, scale_factor=1):
     Gaussian kernel to approximate the area with highest processing
     (usually 2 deg. visual angle).
 
-    Note: The function does not check whether the datamat contains
+    Note: The function does not check whether the DataMat contains
     fixations from different images as it might be desirable to compute
     fdms over fixations from more than one image.
 
@@ -512,7 +519,7 @@ def compute_fdm(datamat, fwhm=2, scale_factor=1):
     assert datamat.pixels_per_degree, 'DataMat has to have a pixels_per_degree field'
     # check whether datamat contains fixations
     if datamat._num_fix == 0 or len( datamat.x) == 0 or len(datamat.y) == 0 :
-        raise NoFixations('There are no fixations in the datamat.')
+        raise NoElements('There are no elements in the DataMat.')
 
     assert not scale_factor <= 0, "scale_factor has to be > 0"
     # this specifies left edges of the histogram bins, i.e. fixations between
@@ -568,9 +575,9 @@ def relative_bias(fm,  scale_factor = 1, estimator = None):
         hist = estimator(samples, e_y, e_x)
     return hist
      
-class NoFixations(Exception):
+class NoElements(Exception):
     """
-    Signals that a DataMat contains no Fixations 
+    Signals that a DataMat contains no elements 
     """
     def __init__(self, msg):
         self.msg = msg
@@ -581,37 +588,37 @@ class NoFixations(Exception):
                                              
 def DirectoryFactory(directory, categories = None, glob_str = '*.mat'):
     """
-    Concatenates all datamats in dir and returns the resulting single
-    datamat.
+    Concatenates all DataMats in the directory and returns the resulting single
+    DataMat.
     
     Parameters:
         directory : string
-            Path from which the datamats should be loaded
+            Path from which the DataMats should be loaded
         categories : instance of stimuli.Categories, optional
-            If given, the resulting datamat provides direct access
+            If given, the resulting DataMat provides direct access
             to the data in the categories object.
         glob_str : string
             A regular expression that defines which mat files are picked up
     Returns:
         f_all : instance of DataMat
-            Contains all datamats that were found in given directory
+            Contains all DataMats that were found in given directory
         
     """
     files = glob(join(directory,glob_str))
     if len(files) == 0:
-        raise ValueError("Could not find any datamats in " + 
+        raise ValueError("Could not find any DataMats in " + 
             join(directory, glob_str))
-    f_all = Factory(join(files.pop()), categories)
+    f_all = MatFactory(join(files.pop()), categories)
     for fname in files:
-        f_current = Factory(join(directory, fname), categories)
+        f_current = MatFactory(join(directory, fname), categories)
         f_all.join(f_current)
 
     return f_all
 
 
-def Factory(datamatfile, categories = None):
+def MatFactory(datamatfile, categories = None):
     """
-    Loads a single datamat (datamatfile).
+    Loads a single DataMat from a MatLab matfile.
     
     Parameters:
         datamatfile : string
