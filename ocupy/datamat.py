@@ -65,6 +65,7 @@ class DataMat(object):
         self._fields = []
         self._categories = categories
         self._parameters = {}
+        print 'WARNING: this needs to be thoroughly tested for indexes that are not boolean np arrays!'
         if datamat is not None and index is not None:
             #index = index.reshape(-1,).astype(bool)
             #assert index.shape[0] == datamat._num_fix, ("Index vector for " +
@@ -99,7 +100,9 @@ class DataMat(object):
                                           'Type'.center(10), 
                                           'Values'.center(20))
         desc += "---------------------+---------------+------------+----------------\n"
-        for field in self._fields:
+        tmp_fieldnames = self._fields[:]
+        tmp_fieldnames.sort()
+        for field in tmp_fieldnames:
             if not self.__dict__[field].dtype == np.object:
                 num_uniques = np.unique(self.__dict__[field])
                 if len(num_uniques) > 5:
@@ -113,7 +116,9 @@ class DataMat(object):
         desc += "---------------------+---------------+------------+----------------\n"
         desc += "%s | %s\n" % ('Parameter Name'.rjust(20), 'Value'.ljust(20))
         desc += "---------------------+---------------------------------------------\n"
-        for param in self._parameters:
+        param_keys = self._parameters.keys()
+        param_keys.sort()
+        for param in param_keys:
             desc += '%s | %s \n' % (param.rjust(20), str(self.__dict__[param]))
         return desc 
    
@@ -264,7 +269,7 @@ class DataMat(object):
     
     def add_field(self, name, data):
         """
-        Add a new field to the datamat.
+        Add a new field to the DataMat.
 
         Parameters:
             name : string
@@ -283,6 +288,23 @@ class DataMat(object):
         self._fields.append(name)
         self.__dict__[name] = data
     
+    def add_field_like(self, name, like_array):
+        """
+        Add a new field to the DataMat with the dtype of the
+        like_array and the shape of the like_array except for the first
+        dimension which will be the same as the other fields of this DataMat.
+        
+        The elements will be NaN.
+        
+        Added by rmuil 2012/01/30
+        """
+        #TODO: handle numpy order?
+        new_shape = list(like_array.shape)
+        new_shape[0] = len(self)
+        new_data = np.empty(new_shape, like_array.dtype)
+        new_data.fill(np.nan)
+        self.add_field(name, new_data)
+
     def rm_field(self, name):
         """
         Remove a field from the datamat.
@@ -346,46 +368,63 @@ class DataMat(object):
         self.rm_parameter(name)
         self.add_field(name, data)
         
-    def join(self, fm_new):
+    def join(self, fm_new, minimal_subset=False):
         """
         Adds content of a new DataMat to this DataMat.
+       
+        If a parameter of the DataMats is not equal, it is promoted to a field.
         
-        If the two DataMats have different fields the minimal subset of both 
-        are present after the join.
+        If the two DataMats have different fields then the elements for the
+        DataMats that did not have the field will be NaN, unless
+        'minimal_subset' is true, in which case the mismatching fields will
+        simply be deleted.
         
-        If a parameter of the DataMats is not equal, it is promoted into a field.
- 
         Parameters
         fm_new : instance of DataMat
             This DataMat is added to the current one.
+        minimal_subset : if true, remove fields which don't exist in both,
+        	instead of using NaNs for missing elements (defaults to False)
+
+        Capacity to use superset of fields added by rmuil 2012/01/30
 
         """
         # Check if parameters are equal. If not, promote them to fields.
         for (nm, val) in self._parameters.items():
             if fm_new._parameters.has_key(nm) and (val != fm_new._parameters[nm]):
-                print "debug: promoting parameter '%s' to field in both DataMats..." % (nm)
+                #print "debug: promoting parameter '%s' to field in both DataMats..." % (nm)
                 self.parameter_to_field(nm)
                 fm_new.parameter_to_field(nm)
             elif nm in fm_new._fields:
-                print "debug: promoting parameter '%s' to field in first DataMat..." % (nm)
+                #print "debug: promoting parameter '%s' to field in first DataMat..." % (nm)
                 self.parameter_to_field(nm)
         for (nm, val) in fm_new._parameters.items():
             if nm in self._fields:
-                print "debug: promoting parameter '%s' to field in second DataMat..." % (nm)
+                #print "debug: promoting parameter '%s' to field in second DataMat..." % (nm)
                 fm_new.parameter_to_field(nm)
+            elif nm not in self._parameters:
+                #print "debug: adding parameter '%s' to first DataMat..." % (nm)
+                self.add_parameter(nm, val)
 
-        # Check if same fields are present, if not only use minimal subset
-        new_fields = []
-        for field in self._fields:
+        # Deal with mismatch in the fields
+        # First those in self that do not exist in new...
+        orig_fields = self._fields[:]
+        for field in orig_fields:
             if not field in fm_new._fields:
-                # field does not exist in f_current, del it from f_all
-                delattr(self, field)
-            else:
-                # field exists, so keep it. afraid of just deleting it while
-                # iterating over the list so reconstruct a new one
-                new_fields.append(field)
-        self._fields = new_fields
-        # Subjectindices must be unique, if indices in f_current are contained
+                if minimal_subset:
+                    self.rm_field(field)
+                else:
+                    fm_new.add_field_like(field, self.field(field))
+        # ... then those in the new that do not exist in self.
+        orig_fields = fm_new._fields[:]
+        for field in orig_fields:
+            if not field in self._fields:
+                if minimal_subset:
+                    fm_new.rm_field(field)
+                else:
+                    self.add_field_like(field, fm_new.field(field))
+
+        #TODO: make this more generic for any field that needs to be unique.
+        # Subject indices must be unique, if indices in f_current are contained
         # in f_all set them to an arbitrary number
         #if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
         #    fm_new.SUBJECTINDEX = np.ones(fm_new.SUBJECTINDEX.shape) * \
