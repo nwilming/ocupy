@@ -65,7 +65,7 @@ class DataMat(object):
         self._fields = []
         self._categories = categories
         self._parameters = {}
-        print 'WARNING: this needs to be thoroughly tested for indexes that are not boolean np arrays!'
+        #print 'WARNING: this needs to be thoroughly tested for indexes that are not boolean np arrays!'
         if datamat is not None and index is not None:
             #index = index.reshape(-1,).astype(bool)
             #assert index.shape[0] == datamat._num_fix, ("Index vector for " +
@@ -171,6 +171,10 @@ class DataMat(object):
     def field(self, fieldname):
         """
         Return field fieldname. fm.field('x') is equivalent to fm.x.
+        
+        The '.' form (fm.x) is always easier in interactive use, but
+        programmatically, this function can be useful if one has the field
+        name in a variable.
 
         Parameters:
             fieldname : string
@@ -292,9 +296,9 @@ class DataMat(object):
         """
         Add a new field to the DataMat with the dtype of the
         like_array and the shape of the like_array except for the first
-        dimension which will be the same as the other fields of this DataMat.
+        dimension which will be instead the field-length of this DataMat.
         
-        The elements will be NaN.
+        The elements of the new field will be NaN.
         
         Added by rmuil 2012/01/30
         """
@@ -304,6 +308,68 @@ class DataMat(object):
         new_data = np.empty(new_shape, like_array.dtype)
         new_data.fill(np.nan)
         self.add_field(name, new_data)
+
+    def copy_field (self, src_dm, data_field, key_field):
+        """
+        Adds a new field (data_field) to the DataMat with data from the
+        corresponding field of another DataMat (src_dm).
+        
+        This is accomplished through the use of a key_field, which is
+        used to determine how the data is copied.
+        
+        The two DataMats are essentially aligned by the unique values
+        of key_field so that each block element of the new field of the target
+        DataMat will come from the first element of src_dm's data_field
+        where the corresponding element in key_field matches.
+        
+        The target DataMat (self) must not have a field name <data_field>
+        already, and both DataMats must have key_field.
+        
+        Examples:
+        
+        >>> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
+        >>> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
+        >>> length(dm_intero)
+        4
+        >>> unique(dm_intero.subject_id)
+        ['p05', 'p06']
+        >>> length(dm_emotiv)
+        3
+        >>> unique(dm_emotiv.subject_id)
+        ['p04', 'p05', 'p06']
+        >>> 'interospective_awareness' in dm_intero.fieldnames()
+        True
+        >>> unique(dm_intero.interospective_awareness) == [0.5555, 0.6666]
+        True
+        >>> 'interospective_awareness' in dm_emotiv.fieldnames()
+        False
+        >>> dm_emotiv.copy_field(dm_intero, 'interospective_awareness', 'subject_id')
+        >>> 'interospective_awareness' in dm_emotiv.fieldnames()
+        True
+        >>> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
+        True
+        
+        Added by rmuil 2012/01/31
+        """
+        if key_field not in self._fields or key_field not in src_dm._fields:
+            raise AttributeError('key field (%s) must exist in both DataMats'%(key_field))
+        if data_field not in src_dm._fields:
+            raise AttributeError('data field (%s) must exist in source DataMat' % (data_field))
+        if data_field in self._fields:
+            raise AttributeError('data field (%s) already exists in target DataMat' % (data_field))
+        
+        #Create a mapping of key_field value to data value.
+        data_to_copy = dict([(x.field(key_field)[0], x.field(data_field)[0]) for x in src_dm.by_field(key_field)])
+        
+        data_element = data_to_copy.values()[0]
+        
+        #Create the new data array of correct size.
+        new_shape = [len(self)] + list(data_element.shape)
+        new_field = np.empty(new_shape, data_element.dtype)
+        
+        new_field.fill(new_field, np.NaN)
+        for (key, val) in data_to_copy:
+            new_field[self.field(key_field) == key] = val
 
     def rm_field(self, name):
         """
