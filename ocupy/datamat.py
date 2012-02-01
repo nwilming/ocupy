@@ -8,6 +8,7 @@ from glob import glob
 import numpy as np
 from scipy.io import loadmat
 from scipy.ndimage.filters import gaussian_filter
+from utils import snip_string_middle
 
 import h5py
 
@@ -90,11 +91,11 @@ class DataMat(object):
         return self._num_fix
 
     def __repr__(self):
-        return 'DataMat(%s elements)' % (self._num_fix)
+        return 'DataMat(%i elements)' % (len(self))
 
     def __str__(self):
-        desc = "DataMat with %i blocks and the following data fields:\n" % (
-                                                                    self._num_fix)
+        desc = "DataMat with %i elements and the following data fields:\n" % (
+                                                                    len(self))
         desc += "%s | %s | %s | %s \n" % ('Field Name'.rjust(20),
                                           'Length'.center(13), 
                                           'Type'.center(10), 
@@ -102,14 +103,21 @@ class DataMat(object):
         desc += "---------------------+---------------+------------+----------------\n"
         tmp_fieldnames = self._fields[:]
         tmp_fieldnames.sort()
+        max_field_val_len = 40
         for field in tmp_fieldnames:
             if not self.__dict__[field].dtype == np.object:
                 num_uniques = np.unique(self.__dict__[field])
                 if len(num_uniques) > 5:
                     num_uniques = 'Many'
+                elif len(str(num_uniques)) > max_field_val_len:
+                    per_val_len = (max_field_val_len // len(num_uniques))-1
+                    if isinstance(num_uniques[0], str) or isinstance(num_uniques[0], unicode):
+                        num_uniques = np.array([snip_string_middle(str(el),per_val_len, '..') for el in num_uniques])
             else:
                 num_uniques = 'N/A'
-            desc += "%s | %s | %s | %s \n" % (field.rjust(20), 
+            
+            field_display_name = snip_string_middle(field, 20)
+            desc += "%s | %s | %s | %s \n" % (field_display_name.rjust(20), 
                                     str(len(self.__dict__[field])).center(13),
                                     str(self.__dict__[field].dtype).center(10),
                                     str(num_uniques).center(20))
@@ -118,9 +126,12 @@ class DataMat(object):
         desc += "---------------------+---------------------------------------------\n"
         param_keys = self._parameters.keys()
         param_keys.sort()
+        max_param_val_len = 13 + 3 + 10 + 3 + 20
         for param in param_keys:
-            desc += '%s | %s \n' % (param.rjust(20), str(self.__dict__[param]))
-        return desc 
+            param_display_name = snip_string_middle(param, 20)
+            desc += '%s | %s \n' % (param_display_name.rjust(20),
+                                    snip_string_middle(str(self.__dict__[param]), max_param_val_len))
+        return desc
    
     def __getitem__(self, key):
         """
@@ -365,11 +376,13 @@ class DataMat(object):
         
         #Create the new data array of correct size.
         new_shape = [len(self)] + list(data_element.shape)
-        new_field = np.empty(new_shape, data_element.dtype)
+        new_data = np.empty(new_shape, data_element.dtype)
         
-        new_field.fill(new_field, np.NaN)
-        for (key, val) in data_to_copy:
-            new_field[self.field(key_field) == key] = val
+        new_data.fill(np.NaN)
+        for (key, val) in data_to_copy.iteritems():
+            new_data[self.field(key_field) == key] = val
+        
+        self.add_field(data_field, new_data)
 
     def rm_field(self, name):
         """
