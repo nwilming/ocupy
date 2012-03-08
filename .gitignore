@@ -1,3 +1,7 @@
+.svn
+build
+dist
+ocupy.egg-info
 *.pyc
 *~
 .*.swp
