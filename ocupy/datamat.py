@@ -108,7 +108,7 @@ class DataMat(object):
             if not self.__dict__[field].dtype == np.object:
                 num_uniques = np.unique(self.__dict__[field])
                 if len(num_uniques) > 5:
-                    num_uniques = 'Many'
+                    num_uniques = '%d unique'%(len(num_uniques))
                 elif len(str(num_uniques)) > max_field_val_len:
                     per_val_len = (max_field_val_len // len(num_uniques))-1
                     if isinstance(num_uniques[0], str) or isinstance(num_uniques[0], unicode):
