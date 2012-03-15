@@ -62,11 +62,12 @@ class DataMat(object):
                 which should be ignored
         TODO: thoroughly test that all indices work as expected (including slicing etc)
         """
-        self._subjects = []
+        
         self._fields = []
-        self._categories = categories
+        self._categories = categories.copy() if categories is not None else None
         self._parameters = {}
-        #print 'WARNING: this needs to be thoroughly tested for indexes that are not boolean np arrays!'
+        self._num_fix = 0
+        #warn('this needs to be thoroughly tested for indexes that are not boolean NumPy arrays!')
         if datamat is not None and index is not None:
             #index = index.reshape(-1,).astype(bool)
             #assert index.shape[0] == datamat._num_fix, ("Index vector for " +
@@ -75,13 +76,12 @@ class DataMat(object):
             #rather than separate objects.
             if not isiterable(index):
                 index = [index]
-            self._subjects = datamat._subjects
-            self._fields = datamat._fields
+            self._fields = datamat._fields[:]
             for  field in self._fields:
                 newfield = datamat.__dict__[field][index]
                 num_fix = len(newfield)
                 self.__dict__[field] = newfield
-            self._parameters = datamat._parameters
+            self._parameters = datamat._parameters.copy()
             for (param, value) in datamat._parameters.iteritems():
                 self.__dict__[param] = value
                 self._parameters[param] = self.__dict__[param]
@@ -333,7 +333,7 @@ class DataMat(object):
         DataMat will come from the first element of src_dm's data_field
         where the corresponding element in key_field matches.
         
-        The target DataMat (self) must not have a field name <data_field>
+        The target DataMat (self) must not have a field name data_field
         already, and both DataMats must have key_field.
         
         Examples:
@@ -502,13 +502,6 @@ class DataMat(object):
                 else:
                     self.add_field_like(field, fm_new.field(field))
 
-        #TODO: make this more generic for any field that needs to be unique.
-        # Subject indices must be unique, if indices in f_current are contained
-        # in f_all set them to an arbitrary number
-        #if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
-        #    fm_new.SUBJECTINDEX = np.ones(fm_new.SUBJECTINDEX.shape) * \
-        #    (max(self.SUBJECTINDEX)+1)
-        
         # Concatenate fields
         for field in self._fields:
             self.__dict__[field] = np.hstack((self.__dict__[field], 
@@ -825,7 +818,6 @@ def MatFactory(datamatfile, categories = None):
         datamat.__dict__[field] = value.reshape(-1,) 
 
     datamat._parameters = parameters
-    datamat._subjects = None
     for (field, value) in parameters.iteritems():
         datamat.__dict__[field] = value
     datamat._num_fix = num_fix
@@ -893,7 +885,6 @@ def VectorFactory(fields, parameters, categories = None):
     for (field, value) in fields.iteritems(): 
         fm.__dict__[field] = value 
     fm._parameters = parameters
-    fm._subjects = None
     for (field, value) in parameters.iteritems():
         fm.__dict__[field] = value
     fm._num_fix = len(fm.__dict__[fields.keys()[0]])
