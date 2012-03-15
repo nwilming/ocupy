@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """A helper module that collects some useful auxillary functions."""
 
-from scipy.misc import toimage, fromimage
+from scipy.misc import toimage, fromimage #@UnresolvedImport
 from numpy import asarray
 import numpy as np
 
@@ -152,7 +152,7 @@ def snip_string_middle(string, max_len=20, snip_string='...'):
     
     return new_string
    
-def snip_string(string, max_len=20, snip_string='...', snip_point=1.0):
+def snip_string(string, max_len=20, snip_string='...', snip_point=0.5):
     """
     Snips a string so that it is no longer than max_len, replacing deleted
     characters with the snip_string.
