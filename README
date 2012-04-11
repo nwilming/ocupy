@@ -1,13 +1,12 @@
 Ocupy - Oculography Analysis Tools
 ----------------------------------
 
-Ocupy provides functionality for eye-tracking data analysis:
+Ocupy provides functionality for analysis of blocked data:
 
-    * FixMat objects for reading of and filtering by fixation- and meta-data
-    * Corresponding objects for stimulus data, aligned to FixMat objects
+    * DataMat objects for reading of and filtering by block meta-data and data
+    * Corresponding objects for stimulus data, aligned to DataMat objects
     * Measures for prediction quality for eye-tracking data: AUC, NSS, KL, EMD.
-    * Lower and upper bound calculation for prediction quality of
-      attention models.
+    * Lower and upper bound calculation for prediction quality of attention models.
     * RPC Client/Server for parallel task execution on a grid
     * Evaluation (with cross-validation) of attention models 
 
@@ -55,5 +54,3 @@ Group at the Unversity of Osnabrueck's Institute of Cognitive Science.
 Project Lead: Niklas Wilming <nwilming@uos.de>
 
 Contributors: Torsten Betz, Hannah Knepper, Johannes Steger, Kilian Klimek
-
-

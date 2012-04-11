@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""This module implements the FixMat Structure for managing eye-tracking data."""
+"""This module implements the DataMat Structure for managing blocked data."""
 
 from os.path import join
 from warnings import warn
@@ -8,115 +8,156 @@ from glob import glob
 import numpy as np
 from scipy.io import loadmat
 from scipy.ndimage.filters import gaussian_filter
+from utils import snip_string_middle
 
 import h5py
 
-class FixMat(object):
+def isiterable(some_object):
+    try:
+        iter(some_object)
+    except TypeError:
+        return False
+    return True
+
+class DataMat(object):
     """
-    Represents fixation data. 
-    The fixmat object presents the fixation data as lists of values to the 
-    user. In general fixation data consists of fixations that have several
-    attributes. A fixation for example has a x and y position, but is also
+    Represents blocked data.
+    The DataMat object presents data, essentially, as discrete blocks. Each block
+    is associated with attributes such as a subject's name or a trial condition.
+    
+    DataMat was FixMat, and so the typical 'block' of data is a fixation.
+     
+    A DataMat consists of lists called 'fields' which represent the raw
+    underlying data and its attributes.
+    
+    A fixation, for example, has an x and a y position, but is also
     associated with the image that was being viewed while the fixation
-    was made. The data can be accessed as attributes of the fixmat::
+    was made. The data can be accessed as attributes of the DataMat:
 
-        >>> fixmat.x    # Returns a list of x-coordinates
-        >>> fixmat.y    # Returns a list of y-coordinates
+        >>> datamat.x    # Returns a list of x-coordinates
+        >>> datamat.y    # Returns a list of y-coordinates
 
-    In this case a single index into anyone of these lists represents a 
+    In this case a single index into any one of these lists represents a 
     fixation:
 
-        >>> (fixmat.x[0], fixmat.y[0])  
+        >>> (datamat.x[0], datamat.y[0])  
 
-
-    .. note:: It is never neccessary to create a FixMat object directly. 
-        This is handled by Fixmat factories.
+    .. note:: It is never necessary to create a DataMat object directly. 
+        This is handled by DataMat factories.
 
     """ 
     
-    def __init__(self, categories = None, fixmat = None, index = None):
+    def __init__(self, categories = None, datamat = None, index = None):
         """
-        Creates a new fixmat from an existing one
+        Creates a new DataMat from an existing one
 
         Parameters:
             categories : optional, instance of stimuli.Categories,
-                allows direct access to image data via the fixmat
-            fixmat : instance of fixmat.FixMat, optional
-                if given, the existing fixmat is copied and only thos fixations
+                allows direct access to image data via the DataMat
+            datamat : instance of datamat.DataMat, optional
+                if given, the existing DataMat is copied and only those fixations
                 that are marked True in index are retained.
-            index : list of True or False, same length as fields of fixmat
-                Indicates which fixations should be used for the new fixmat and
+            index : list of True or False, same length as fields of DataMat
+                Indicates which blocks should be used for the new DataMat and
                 which should be ignored
+        TODO: thoroughly test that all indices work as expected (including slicing etc)
         """
         self._subjects = []
         self._fields = []
         self._categories = categories
         self._parameters = {}
-        if fixmat is not None and index is not None:
-            index = index.reshape(-1,).astype(bool)
-            assert index.shape[0] == fixmat._num_fix, ("Index vector for " +
-                "filtering has to have the same length as the fields of the fixmat")
-            self._subjects = fixmat._subjects
-            self._fields = fixmat._fields
+        #print 'WARNING: this needs to be thoroughly tested for indexes that are not boolean np arrays!'
+        if datamat is not None and index is not None:
+            #index = index.reshape(-1,).astype(bool)
+            #assert index.shape[0] == datamat._num_fix, ("Index vector for " +
+            #    "filtering has to have the same length as the fields of the DataMat")
+            #TODO: check this for slicing operations (fields will be views
+            #rather than separate objects.
+            if not isiterable(index):
+                index = [index]
+            self._subjects = datamat._subjects
+            self._fields = datamat._fields
             for  field in self._fields:
-                self.__dict__[field] = fixmat.__dict__[field][index]
-            self._parameters = fixmat._parameters
-            for (param, value) in fixmat._parameters.iteritems():
+                newfield = datamat.__dict__[field][index]
+                num_fix = len(newfield)
+                self.__dict__[field] = newfield
+            self._parameters = datamat._parameters
+            for (param, value) in datamat._parameters.iteritems():
                 self.__dict__[param] = value
                 self._parameters[param] = self.__dict__[param]
-            self._num_fix = index.sum()
+            self._num_fix = num_fix
     
+    def __len__(self):
+        return self._num_fix
+
+    def __repr__(self):
+        return 'DataMat(%i elements)' % (len(self))
+
     def __str__(self):
-        desc = "Fixmat with %i fixations and the following data fields:\n" % (
-                                                                    self._num_fix)
+        desc = "DataMat with %i elements and the following data fields:\n" % (
+                                                                    len(self))
         desc += "%s | %s | %s | %s \n" % ('Field Name'.rjust(20),
                                           'Length'.center(13), 
                                           'Type'.center(10), 
                                           'Values'.center(20))
         desc += "---------------------+---------------+------------+----------------\n"
-        for field in self._fields:
+        tmp_fieldnames = self._fields[:]
+        tmp_fieldnames.sort()
+        max_field_val_len = 40
+        for field in tmp_fieldnames:
             if not self.__dict__[field].dtype == np.object:
                 num_uniques = np.unique(self.__dict__[field])
                 if len(num_uniques) > 5:
                     num_uniques = 'Many'
+                elif len(str(num_uniques)) > max_field_val_len:
+                    per_val_len = (max_field_val_len // len(num_uniques))-1
+                    if isinstance(num_uniques[0], str) or isinstance(num_uniques[0], unicode):
+                        num_uniques = np.array([snip_string_middle(str(el),per_val_len, '..') for el in num_uniques])
             else:
                 num_uniques = 'N/A'
-            desc += "%s | %s | %s | %s \n" % (field.rjust(20), 
+            
+            field_display_name = snip_string_middle(field, 20)
+            desc += "%s | %s | %s | %s \n" % (field_display_name.rjust(20), 
                                     str(len(self.__dict__[field])).center(13),
                                     str(self.__dict__[field].dtype).center(10),
                                     str(num_uniques).center(20))
         desc += "---------------------+---------------+------------+----------------\n"
         desc += "%s | %s\n" % ('Parameter Name'.rjust(20), 'Value'.ljust(20))
         desc += "---------------------+---------------------------------------------\n"
-        for param in self._parameters:
-            desc += '%s | %s \n' % (param.rjust(20), str(self.__dict__[param]))
-        return desc 
+        param_keys = self._parameters.keys()
+        param_keys.sort()
+        max_param_val_len = 13 + 3 + 10 + 3 + 20
+        for param in param_keys:
+            param_display_name = snip_string_middle(param, 20)
+            desc += '%s | %s \n' % (param_display_name.rjust(20),
+                                    snip_string_middle(str(self.__dict__[param]), max_param_val_len))
+        return desc
    
     def __getitem__(self, key):
         """
-        Returns a filtered fixmat which only includes fixation that are
+        Returns a filtered DataMat which only includes elements that are
         allowed by index 
         
 		
         Parameters:
             index : numpy array
-                A logical array that is True for fixations that are in 
-                the returned fixmat and False for fixations that are 
+                A logical array that is True for elements that are in 
+                the returned DataMat and False for elements that are 
                 excluded.
         
         Notes:
-            See fixmat.filter for more info.
+            See datamat.filter for more info.
         """
         #if isinstance(key, IntType):
         #    self._categories[key]
         #else:
         return self.filter(key)
             
-    def filter(self, index):
+    def filter(self, index): #@ReservedAssignment
         """
-        Filters a fixmat by different aspects.
+        Filters a DataMat by different aspects.
         
-        This function is a device to filter the fixmat by certain logical 
+        This function is a device to filter the DataMat by certain logical 
         conditions. It takes as input a logical array (contains only True
         or False for every fixation) and kicks out all fixations for which
         the array says False. The logical array can conveniently be created
@@ -130,17 +171,21 @@ class FixMat(object):
     
         Parameters:
             index : array
-                Array-like that contains True for every fixtation that
+                Array-like that contains True for every element that
                 passes the filter; else contains False
         Returns:
-            fixmat : FixMat Instance
+            datamat : DataMat Instance
         
         """
-        return FixMat(categories=self._categories, fixmat=self, index=index)
+        return DataMat(categories=self._categories, datamat=self, index=index)
 
     def field(self, fieldname):
         """
         Return field fieldname. fm.field('x') is equivalent to fm.x.
+        
+        The '.' form (fm.x) is always easier in interactive use, but
+        programmatically, this function can be useful if one has the field
+        name in a variable.
 
         Parameters:
             fieldname : string
@@ -149,19 +194,19 @@ class FixMat(object):
         try:
             return self.__dict__[fieldname]
         except KeyError:
-            raise ValueError('%s is not a field or parameter of the fixmat'
+            raise ValueError('%s is not a field or parameter of the DataMat'
                     % fieldname)
             
     def save(self, path):
         """
-        Saves fixmat to path.
+        Saves DataMat to path.
         
         Parameters:
             path : string   
                 Absolute path of the file to save to.
         """
         f = h5py.File(path, 'w')
-        fm_group = f.create_group('Fixmat')
+        fm_group = f.create_group('DataMat')
         for field in self.fieldnames():
             fm_group.create_dataset(field, data = self.__dict__[field])
         for param in self.parameters():
@@ -171,7 +216,7 @@ class FixMat(object):
                 
     def fieldnames(self):
         """
-        Returns a list of data fields that are present in the fixmat.
+        Returns a list of data fields that are present in the DataMat.
         """
         return self._fields
             
@@ -180,7 +225,7 @@ class FixMat(object):
         Return a list of parameters that are available. 
         
         .. note::Parameters refer to things like 'image_size', 'pixels_per_degree', 
-            i.e. values that are valid for the entire fixmat.
+            i.e. values that are valid for the entire DataMat.
         """
         return self._parameters
                             
@@ -190,10 +235,10 @@ class FixMat(object):
         
         Parameters:
             field : string
-                Filters the fixmat for every unique value in field and yields 
-                the filtered fixmat.
+                Filters the datamat for every unique value in field and yields 
+                the filtered datamat.
         Returns:
-            fixmat : FixMat that is filtered according to one of the unique
+            datamat : DataMat that is filtered according to one of the unique
                 values in 'field'.
         """
         for value in np.unique(self.__dict__[field]):
@@ -201,14 +246,14 @@ class FixMat(object):
 
     def by_cat(self): 
         """
-        Iterates over categories and returns a filtered fixmat. 
+        Iterates over categories and returns a filtered datamat. 
         
         If a categories object is attached, the images object for the given 
         category is returned as well (else None is returned).
         
         Returns:
-            (fixmat, categories) : A tuple that contains first the filtered
-                fixmat (has only one category) and second the associated 
+            (datamat, categories) : A tuple that contains first the filtered
+                datamat (has only one category) and second the associated 
                 categories object (if it is available, None otherwise)
         """
         for value in np.unique(self.category):
@@ -220,14 +265,14 @@ class FixMat(object):
              
     def by_filenumber(self): 
         """
-        Iterates over categories and returns a filtered fixmat. 
+        Iterates over categories and returns a filtered datamat. 
         
         If a categories object is attached, the images object for the given 
         category is returned as well (else None is returned).
         
         Returns:
-            (fixmat, categories) : A tuple that contains first the filtered
-                fixmat (has only one category) and second the associated 
+            (datamat, categories) : A tuple that contains first the filtered
+                datamat (has only one category) and second the associated 
                 categories object (if it is available, None otherwise)
         """
         for value in np.unique(self.filenumber):
@@ -239,7 +284,7 @@ class FixMat(object):
     
     def add_field(self, name, data):
         """
-        Add a new field to the fixmat.
+        Add a new field to the DataMat.
 
         Parameters:
             name : string
@@ -258,9 +303,90 @@ class FixMat(object):
         self._fields.append(name)
         self.__dict__[name] = data
     
+    def add_field_like(self, name, like_array):
+        """
+        Add a new field to the DataMat with the dtype of the
+        like_array and the shape of the like_array except for the first
+        dimension which will be instead the field-length of this DataMat.
+        
+        The elements of the new field will be NaN.
+        
+        Added by rmuil 2012/01/30
+        """
+        #TODO: handle numpy order?
+        new_shape = list(like_array.shape)
+        new_shape[0] = len(self)
+        new_data = np.empty(new_shape, like_array.dtype)
+        new_data.fill(np.nan)
+        self.add_field(name, new_data)
+
+    def copy_field (self, src_dm, data_field, key_field):
+        """
+        Adds a new field (data_field) to the DataMat with data from the
+        corresponding field of another DataMat (src_dm).
+        
+        This is accomplished through the use of a key_field, which is
+        used to determine how the data is copied.
+        
+        The two DataMats are essentially aligned by the unique values
+        of key_field so that each block element of the new field of the target
+        DataMat will come from the first element of src_dm's data_field
+        where the corresponding element in key_field matches.
+        
+        The target DataMat (self) must not have a field name <data_field>
+        already, and both DataMats must have key_field.
+        
+        Examples:
+        
+        >>> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
+        >>> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
+        >>> length(dm_intero)
+        4
+        >>> unique(dm_intero.subject_id)
+        ['p05', 'p06']
+        >>> length(dm_emotiv)
+        3
+        >>> unique(dm_emotiv.subject_id)
+        ['p04', 'p05', 'p06']
+        >>> 'interospective_awareness' in dm_intero.fieldnames()
+        True
+        >>> unique(dm_intero.interospective_awareness) == [0.5555, 0.6666]
+        True
+        >>> 'interospective_awareness' in dm_emotiv.fieldnames()
+        False
+        >>> dm_emotiv.copy_field(dm_intero, 'interospective_awareness', 'subject_id')
+        >>> 'interospective_awareness' in dm_emotiv.fieldnames()
+        True
+        >>> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
+        True
+        
+        Added by rmuil 2012/01/31
+        """
+        if key_field not in self._fields or key_field not in src_dm._fields:
+            raise AttributeError('key field (%s) must exist in both DataMats'%(key_field))
+        if data_field not in src_dm._fields:
+            raise AttributeError('data field (%s) must exist in source DataMat' % (data_field))
+        if data_field in self._fields:
+            raise AttributeError('data field (%s) already exists in target DataMat' % (data_field))
+        
+        #Create a mapping of key_field value to data value.
+        data_to_copy = dict([(x.field(key_field)[0], x.field(data_field)[0]) for x in src_dm.by_field(key_field)])
+        
+        data_element = data_to_copy.values()[0]
+        
+        #Create the new data array of correct size.
+        new_shape = [len(self)] + list(data_element.shape)
+        new_data = np.empty(new_shape, data_element.dtype)
+        
+        new_data.fill(np.NaN)
+        for (key, val) in data_to_copy.iteritems():
+            new_data[self.field(key_field) == key] = val
+        
+        self.add_field(data_field, new_data)
+
     def rm_field(self, name):
         """
-        Remove a field from the fixmat.
+        Remove a field from the datamat.
 
         Parameters:
             name : string
@@ -272,49 +398,116 @@ class FixMat(object):
         self._fields.remove(name)
         del self.__dict__[name]
 
-    def join(self, fm_new):
+    def add_parameter(self, name, value):
         """
-        Adds content of a new fixmat to this fixmat.
+        Adds a parameter to the existing DataMat.
         
-        If the two fixmats have different fields the minimal subset of both 
-        are present after the join. Parameters of the fixmats must be the 
-        same.
- 
+        Fails if parameter with same name already exists or if name is otherwise
+        in this objects ___dict__ dictionary.
+        
+        Added by rmuil on 2012/01/26
+        """
+        if self._parameters.has_key(name):
+            raise ValueError("'%s' is already a parameter" % (name))
+        elif self.__dict__.has_key(name):
+            raise ValueError("'%s' conflicts with the DataMat name-space" % (name))
+        
+        self.__dict__[name] = value
+        self._parameters[name] = self.__dict__[name]
+
+    def rm_parameter(self, name):
+        """
+        Removes a parameter to the existing DataMat.
+        
+        Fails if parameter doesn't exist.
+        
+        Added by rmuil on 2012/01/26
+        """
+        if not self._parameters.has_key(name):
+            raise ValueError("no '%s' parameter found" % (name))
+
+        del self._parameters[name]
+        del self.__dict__[name]
+        
+    def parameter_to_field(self, name):
+        """
+        Promotes a parameter to a field by creating a new array of same
+        size as the other existing fields, filling it with the current
+        value of the parameter, and then removing that parameter.
+        
+        Added by rmuil on 2012/01/26
+        """
+        if not self._parameters.has_key(name):
+            raise ValueError("no '%s' parameter found" % (name))
+        if self._fields.count(name) > 0:
+            raise ValueError("field with name '%s' already exists" % (name))
+        
+        data = np.array([self._parameters[name]]*self._num_fix)
+
+        self.rm_parameter(name)
+        self.add_field(name, data)
+        
+    def join(self, fm_new, minimal_subset=False):
+        """
+        Adds content of a new DataMat to this DataMat.
+       
+        If a parameter of the DataMats is not equal, it is promoted to a field.
+        
+        If the two DataMats have different fields then the elements for the
+        DataMats that did not have the field will be NaN, unless
+        'minimal_subset' is true, in which case the mismatching fields will
+        simply be deleted.
+        
         Parameters
-        fm_new : Instance of Fixmat
-            This fixmat is added to the current one. Can only contain data
-            from one subject.
+        fm_new : instance of DataMat
+            This DataMat is added to the current one.
+        minimal_subset : if true, remove fields which don't exist in both,
+        	instead of using NaNs for missing elements (defaults to False)
+
+        Capacity to use superset of fields added by rmuil 2012/01/30
 
         """
-        # Check if new fixmat has only data from one subject
-        if not len(np.unique(fm_new.SUBJECTINDEX))==1:
-            raise (RuntimeError(
-                """Can only join fixmats if new fixmat has data from only 
-                one subject"""))
-        
-        # Check if parameters are equal
-        #for ((n_cu, v_cu), (_, v_all)) in zip(fm_new._parameters.iteritems(),
-        #                                        self._parameters.iteritems()):
-        #    if not v_cu == v_all:
-        #        raise (RuntimeError("""Parameter %s has value %s in current and
-        #             value %s in new fixmat""" %(n_cu, str(v_all), str(v_cu))))
+        # Check if parameters are equal. If not, promote them to fields.
+        for (nm, val) in self._parameters.items():
+            if fm_new._parameters.has_key(nm) and (val != fm_new._parameters[nm]):
+                #print "debug: promoting parameter '%s' to field in both DataMats..." % (nm)
+                self.parameter_to_field(nm)
+                fm_new.parameter_to_field(nm)
+            elif nm in fm_new._fields:
+                #print "debug: promoting parameter '%s' to field in first DataMat..." % (nm)
+                self.parameter_to_field(nm)
+        for (nm, val) in fm_new._parameters.items():
+            if nm in self._fields:
+                #print "debug: promoting parameter '%s' to field in second DataMat..." % (nm)
+                fm_new.parameter_to_field(nm)
+            elif nm not in self._parameters:
+                #print "debug: adding parameter '%s' to first DataMat..." % (nm)
+                self.add_parameter(nm, val)
 
-        # Check if same fields are present, if not only use minimal subset
-        new_fields = []
-        for field in self._fields:
+        # Deal with mismatch in the fields
+        # First those in self that do not exist in new...
+        orig_fields = self._fields[:]
+        for field in orig_fields:
             if not field in fm_new._fields:
-                # field does not exist in f_current, del it from f_all
-                delattr(self, field)
-            else:
-                # field exists, so keep it. afraid of just deleting it while
-                # iterating over the list so reconstruct a new one
-                new_fields.append(field)
-        self._fields = new_fields
-        # Subjectindices must be unique, if indices in f_current are contained
+                if minimal_subset:
+                    self.rm_field(field)
+                else:
+                    fm_new.add_field_like(field, self.field(field))
+        # ... then those in the new that do not exist in self.
+        orig_fields = fm_new._fields[:]
+        for field in orig_fields:
+            if not field in self._fields:
+                if minimal_subset:
+                    fm_new.rm_field(field)
+                else:
+                    self.add_field_like(field, fm_new.field(field))
+
+        #TODO: make this more generic for any field that needs to be unique.
+        # Subject indices must be unique, if indices in f_current are contained
         # in f_all set them to an arbitrary number
-        if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
-            fm_new.SUBJECTINDEX = np.ones(fm_new.SUBJECTINDEX.shape) * \
-            (max(self.SUBJECTINDEX)+1)
+        #if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
+        #    fm_new.SUBJECTINDEX = np.ones(fm_new.SUBJECTINDEX.shape) * \
+        #    (max(self.SUBJECTINDEX)+1)
         
         # Concatenate fields
         for field in self._fields:
@@ -328,14 +521,14 @@ class FixMat(object):
     def add_feature_values(self, features):
         """
         Adds feature values of feature 'feature' to all fixations in 
-        the calling fixmat.
+        the calling DataMat.
         
         For fixations out of the image boundaries, NaNs are returned.
         The function generates a new attribute field named with the
         string in features that contains an np.array listing feature
-        values for every fixation in the fixmat.
+        values for every fixation in the DataMat.
         
-        .. note:: The calling fixmat must have been constructed with an 
+        .. note:: The calling DataMat must have been constructed with an 
         stimuli.Categories object
         
         Parameters:
@@ -348,9 +541,9 @@ class FixMat(object):
  
         if not self._categories:
             raise RuntimeError(
-            '''"%s" does not exist as a fieldname and the
-            fixmat does not have a Categories object (no features 
-            available. The fixmat has these fields: %s''' \
+            '''"%s" does not exist as a field and the
+            DataMat does not have a Categories object (no features 
+            available. The DataMat has these fields: %s''' \
             %(features, str(self._fields))) 
         for feature in features:
             # initialize new field with NaNs
@@ -373,7 +566,7 @@ class FixMat(object):
         Generates two M x N matrices with M feature values at fixations for 
         N features. Controls are a random sample out of all non-fixated regions 
         of an image or fixations of the same subject group on a randomly chosen 
-        image. Fixations are pooled over all subjects in the calling fixmat.
+        image. Fixations are pooled over all subjects in the calling DataMat.
        
         Parameters : 
             all_controls : bool
@@ -402,7 +595,7 @@ class FixMat(object):
         on_image = (self.x >= 0) & (self.x <= self.image_size[1])
         on_image = on_image & (self.y >= 0) & (self.y <= self.image_size[0])
         assert on_image.all(), "All Fixations need to be on the image"
-        assert len(np.unique(self.filenumber) > 1), "Fixmat has to have more than one filenumber"
+        assert len(np.unique(self.filenumber) > 1), "DataMat has to have more than one filenumber"
         self.x = self.x.astype(int)
         self.y = self.y.astype(int)
         
@@ -452,14 +645,14 @@ class FixMat(object):
 
 def load(path):
     """
-    Load fixmat at path.
+    Load datamat at path.
     
     Parameters:
         path : string
             Absolute path of the file to load from.
     """
     f = h5py.File(path,'r')
-    fm_group = f['Fixmat']
+    fm_group = f['DataMat']
     fields = {}
     params = {}
     for field, value in fm_group.iteritems():
@@ -467,12 +660,12 @@ def load(path):
     for param, value in fm_group.attrs.iteritems():
         params[param] = value
     f.close()
-    return VectorFixmatFactory(fields, params)
+    return VectorFactory(fields, params)
 
 
-def compute_fdm(fixmat, fwhm=2, scale_factor=1):
+def compute_fdm(datamat, fwhm=2, scale_factor=1):
     """
-    Computes a fixation density map for the calling fixmat. 
+    Computes a fixation density map for the calling DataMat. 
     
     Creates a map the size of the image fixations were recorded on.  
     Every pixel contains the frequency of fixations
@@ -480,7 +673,7 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
     Gaussian kernel to approximate the area with highest processing
     (usually 2 deg. visual angle).
 
-    Note: The function does not check whether the fixmat contains
+    Note: The function does not check whether the DataMat contains
     fixations from different images as it might be desirable to compute
     fdms over fixations from more than one image.
 
@@ -495,25 +688,25 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
         
     Returns:
         fdm  : numpy.array 
-            a numpy.array of size fixmat.image_size containing
+            a numpy.array of size datamat.image_size containing
             the fixation probability for every location on the image.
     """
     # image category must exist (>-1) and image_size must be non-empty
-    assert (len(fixmat.image_size) == 2 and (fixmat.image_size[0] > 0) and
-        (fixmat.image_size[1] > 0)), 'The image_size is either 0, or not 2D'
-    assert fixmat.pixels_per_degree, 'Fixmat has to have a pixels_per_degree field'
-    # check whether fixmat contains fixations
-    if fixmat._num_fix == 0 or len( fixmat.x) == 0 or len(fixmat.y) == 0 :
-        raise NoFixations('There are no fixations in the fixmat.')
+    assert (len(datamat.image_size) == 2 and (datamat.image_size[0] > 0) and
+        (datamat.image_size[1] > 0)), 'The image_size is either 0, or not 2D'
+    assert datamat.pixels_per_degree, 'DataMat has to have a pixels_per_degree field'
+    # check whether datamat contains fixations
+    if datamat._num_fix == 0 or len( datamat.x) == 0 or len(datamat.y) == 0 :
+        raise NoElements('There are no elements in the DataMat.')
 
     assert not scale_factor <= 0, "scale_factor has to be > 0"
     # this specifies left edges of the histogram bins, i.e. fixations between
     # ]0 binedge[0]] are included. --> fixations are ceiled
-    e_y = np.arange(0, np.round(scale_factor*fixmat.image_size[0]+1))
-    e_x = np.arange(0, np.round(scale_factor*fixmat.image_size[1]+1))
-    samples = np.array(zip((scale_factor*fixmat.y), (scale_factor*fixmat.x)))
+    e_y = np.arange(0, np.round(scale_factor*datamat.image_size[0]+1))
+    e_x = np.arange(0, np.round(scale_factor*datamat.image_size[1]+1))
+    samples = np.array(zip((scale_factor*datamat.y), (scale_factor*datamat.x)))
     (hist, _) = np.histogramdd(samples, (e_y, e_x))
-    kernel_sigma = fwhm * fixmat.pixels_per_degree * scale_factor
+    kernel_sigma = fwhm * datamat.pixels_per_degree * scale_factor
     kernel_sigma = kernel_sigma / (2 * (2 * np.log(2)) ** .5)
     fdm = gaussian_filter(hist, kernel_sigma, order=0, mode='constant')
     return fdm / fdm.sum()
@@ -524,7 +717,7 @@ def relative_bias(fm,  scale_factor = 1, estimator = None):
     and amplitudes. 
 
     Parameters:
-        fm : FixMat
+        fm : DataMat
             The fixation data to use
         scale_factor : double
     Returns:
@@ -560,9 +753,9 @@ def relative_bias(fm,  scale_factor = 1, estimator = None):
         hist = estimator(samples, e_y, e_x)
     return hist
      
-class NoFixations(Exception):
+class NoElements(Exception):
     """
-    Signals that a FixMat contains no Fixations 
+    Signals that a DataMat contains no elements 
     """
     def __init__(self, msg):
         self.msg = msg
@@ -571,47 +764,47 @@ class NoFixations(Exception):
         return repr(self.msg)
         
                                              
-def DirectoryFixmatFactory(directory, categories = None, glob_str = '*.mat'):
+def DirectoryFactory(directory, categories = None, glob_str = '*.mat'):
     """
-    Concatenates all fixmats in dir and returns the resulting single
-    fixmat.
+    Concatenates all DataMats in the directory and returns the resulting single
+    DataMat.
     
     Parameters:
         directory : string
-            Path from which the fixmats should be loaded
+            Path from which the DataMats should be loaded
         categories : instance of stimuli.Categories, optional
-            If given, the resulting fixmat provides direct access
+            If given, the resulting DataMat provides direct access
             to the data in the categories object.
         glob_str : string
             A regular expression that defines which mat files are picked up
     Returns:
-        f_all : instance of FixMat
-            Contains all fixmats that were found in given directory
+        f_all : instance of DataMat
+            Contains all DataMats that were found in given directory
         
     """
     files = glob(join(directory,glob_str))
     if len(files) == 0:
-        raise ValueError("Could not find any fixmats in " + 
+        raise ValueError("Could not find any DataMats in " + 
             join(directory, glob_str))
-    f_all = FixmatFactory(join(files.pop()), categories)
+    f_all = MatFactory(join(files.pop()), categories)
     for fname in files:
-        f_current = FixmatFactory(join(directory, fname), categories)
+        f_current = MatFactory(join(directory, fname), categories)
         f_all.join(f_current)
 
     return f_all
 
 
-def FixmatFactory(fixmatfile, categories = None):
+def MatFactory(datamatfile, categories = None):
     """
-    Loads a single fixmat (fixmatfile).
+    Loads a single DataMat from a MatLab matfile.
     
     Parameters:
-        fixmatfile : string
-            The matlab fixmat that should be loaded.
+        datamatfile : string
+            The matlab datamat that should be loaded.
         categories : instance of stimuli.Categories, optional
-            Links data in categories to data in fixmat.
+            Links data in categories to data in datamat.
     """
-    data = loadmat(fixmatfile, struct_as_record = False)['fixmat'][0][0]
+    data = loadmat(datamatfile, struct_as_record = False)['datamat'][0][0]
     num_fix = data.x.size
     
     # Get a list with fieldnames and a list with parameters
@@ -625,24 +818,24 @@ def FixmatFactory(fixmatfile, categories = None):
             if len(parameters[field]) == 1:
                 parameters[field] = parameters[field][0]
     
-    # Generate FixMat
-    fixmat = FixMat(categories = categories)
-    fixmat._fields = fields.keys()
+    # Generate DataMat
+    datamat = DataMat(categories = categories)
+    datamat._fields = fields.keys()
     for (field, value) in fields.iteritems():
-        fixmat.__dict__[field] = value.reshape(-1,) 
+        datamat.__dict__[field] = value.reshape(-1,) 
 
-    fixmat._parameters = parameters
-    fixmat._subjects = None
+    datamat._parameters = parameters
+    datamat._subjects = None
     for (field, value) in parameters.iteritems():
-        fixmat.__dict__[field] = value
-    fixmat._num_fix = num_fix
-    return fixmat
+        datamat.__dict__[field] = value
+    datamat._num_fix = num_fix
+    return datamat
     
-def TestFixmatFactory(points = None, categories = [1], 
+def TestFactory(points = None, categories = [1], 
                 filenumbers = [1], subjectindices = [1], params = None,
                 categories_obj = None):
     """ 
-    Returns a fixmat where the content is known. 
+    Returns a datamat where the content is known. 
 
     Parameters:
         points : list, optional
@@ -654,20 +847,20 @@ def TestFixmatFactory(points = None, categories = [1],
             repeated for every category.
         subjectindices : list, default = [1]
             Subjectindices to be used for the fixations. Every subjectindex will show
-            up for every category in the test fixmat. 
+            up for every category in the test datamat. 
         params : dictionary, optional
-            A list of parameters that is set for the resulting fixmat. Defaults 
+            A list of parameters that is set for the resulting datamat. Defaults 
             are 'image_size':[922,1272] and 'pxels_per_degree':36
 
     """
     default_parameters = {'image_size':[922, 1272], 'pixels_per_degree':36}
-    fixmat = FixMat(categories=categories_obj)
-    fixmat.x = [] 
-    fixmat.y = []
-    fixmat.SUBJECTINDEX = []
-    fixmat.filenumber = []
-    fixmat.category = []
-    fixmat.fix = [] 
+    datamat = DataMat(categories=categories_obj)
+    datamat.x = [] 
+    datamat.y = []
+    datamat.SUBJECTINDEX = []
+    datamat.filenumber = []
+    datamat.category = []
+    datamat.fix = [] 
     if not params is None:
         default_parameters.update(params)
     if points == None:
@@ -676,32 +869,32 @@ def TestFixmatFactory(points = None, categories = [1],
     for cat in categories:
         for sub in subjectindices:
             for img in filenumbers:
-                fixmat.x = np.hstack((fixmat.x, np.array(points[0])))
-                fixmat.y = np.hstack((fixmat.y, np.array(points[1])))
-                fixmat.SUBJECTINDEX = np.hstack((fixmat.SUBJECTINDEX, sub *
+                datamat.x = np.hstack((datamat.x, np.array(points[0])))
+                datamat.y = np.hstack((datamat.y, np.array(points[1])))
+                datamat.SUBJECTINDEX = np.hstack((datamat.SUBJECTINDEX, sub *
                     np.ones(len(points[0]))))
-                fixmat.category = np.hstack((fixmat.category, cat *
+                datamat.category = np.hstack((datamat.category, cat *
                     np.ones(len(points[0]))))
-                fixmat.filenumber = np.hstack((fixmat.filenumber, img *
+                datamat.filenumber = np.hstack((datamat.filenumber, img *
                     np.ones(len(points[0]))))
-                fixmat.fix = np.hstack((fixmat.fix, range(0,len(points[0]))))
+                datamat.fix = np.hstack((datamat.fix, range(0,len(points[0]))))
  
 
-    fixmat._fields = ['x', 'y', 'SUBJECTINDEX', 'filenumber', 'category', 'fix']
-    fixmat._parameters = default_parameters
+    datamat._fields = ['x', 'y', 'SUBJECTINDEX', 'filenumber', 'category', 'fix']
+    datamat._parameters = default_parameters
     for (field, value) in default_parameters.iteritems():
-        fixmat.__dict__[field] = value
-    fixmat._num_fix  = len(fixmat.x)
-    return fixmat
+        datamat.__dict__[field] = value
+    datamat._num_fix  = len(datamat.x)
+    return datamat
 
-def VectorFixmatFactory(fields, parameters, categories = None):
-    fm = FixMat(categories = categories)
+def VectorFactory(fields, parameters, categories = None):
+    fm = DataMat(categories = categories)
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
         fm.__dict__[field] = value 
     fm._parameters = parameters
     fm._subjects = None
-    for (field, value) in parameters.iteritems(): 
-       fm.__dict__[field] = value
+    for (field, value) in parameters.iteritems():
+        fm.__dict__[field] = value
     fm._num_fix = len(fm.__dict__[fields.keys()[0]])
     return fm

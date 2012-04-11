@@ -129,3 +129,103 @@ def dict_fun(data, function):
     result[key] = function(data[key])
     """
     return dict((k, function(v)) for k, v in data.items())
+
+def snip_string_middle(string, max_len, snip_string='...'):
+    """
+    >>> snip_string_middle('this is long', 8)
+    'th...ong'
+    >>> snip_string_middle('this is long', 12)
+    'this is long'
+    >>> snip_string_middle('this is long', 8, '~')
+    'thi~long'
+    
+    """
+    if len(string) <= max_len:
+        new_string = string
+    else:
+        visible_len = (max_len - len(snip_string))
+        start_len = visible_len//2
+        end_len = visible_len-start_len
+        
+        new_string = string[0:start_len]+ snip_string + string[-end_len:]
+        
+    
+    return new_string 
+
+def find_common_beginning(string_list, boundary_char = None):
+    """Given a list of strings, finds finds the longest string that is common
+    to the *beginning* of all strings in the list.
+    
+    boundary_char defines a boundary that must be preserved, so that the
+    common string removed must end with this char.
+    """
+    
+    common=''
+    
+    # by definition there is nothing common to 1 item...
+    if len(string_list) > 1:
+        shortestLen = min([len(el) for el in string_list])
+        
+        for idx in range(shortestLen):
+            chars = [s[idx] for s in string_list]
+            if chars.count(chars[0]) != len(chars): # test if any chars differ
+                break
+            common+=chars[0]
+    
+        
+    if boundary_char is not None:
+        try:
+            end_idx = common.rindex(boundary_char)
+            common = common[0:end_idx+1]
+        except ValueError:
+            common = ''
+    
+    return common
+
+def factorise_strings (string_list, boundary_char=None):
+    """Given a list of strings, finds the longest string that is common
+    to the *beginning* of all strings in the list and
+    returns a new list whose elements lack this common beginning.
+    
+    boundary_char defines a boundary that must be preserved, so that the
+    common string removed must end with this char.
+    
+    >>> cmn='something/to/begin with?'
+    >>> blah=[cmn+'yes',cmn+'no',cmn+'?maybe']
+    >>> (blee, bleecmn) = factorise_strings(blah)
+    >>> blee
+    ['yes', 'no', '?maybe']
+    >>> bleecmn == cmn
+    True
+    
+    >>> blah = ['de.uos.nbp.senhance', 'de.uos.nbp.heartFelt']
+    >>> (blee, bleecmn) = factorise_strings(blah, '.')
+    >>> blee
+    ['senhance', 'heartFelt']
+    >>> bleecmn
+    'de.uos.nbp.'
+    
+    >>> blah = ['/some/deep/dir/subdir', '/some/deep/other/dir', '/some/deep/other/dir2']
+    >>> (blee, bleecmn) = factorise_strings(blah, '/')
+    >>> blee
+    ['dir/subdir', 'other/dir', 'other/dir2']
+    >>> bleecmn
+    '/some/deep/'
+    
+    >>> blah = ['/net/store/nbp/heartFelt/data/ecg/emotive_interoception/p20/2012-01-27T09.01.14-ecg.csv', '/net/store/nbp/heartFelt/data/ecg/emotive_interoception/p21/2012-01-27T11.03.08-ecg.csv', '/net/store/nbp/heartFelt/data/ecg/emotive_interoception/p23/2012-01-31T12.02.55-ecg.csv']
+    >>> (blee, bleecmn) = factorise_strings(blah, '/')
+    >>> bleecmn
+    '/net/store/nbp/heartFelt/data/ecg/emotive_interoception/'
+    
+    rmuil 2012/02/01
+    """
+    
+    cmn = find_common_beginning(string_list, boundary_char)
+    
+    new_list = [el[len(cmn):] for el in string_list]
+
+    return (new_list, cmn)
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
