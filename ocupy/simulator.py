@@ -48,10 +48,9 @@ def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.fit2d):
 
     ld = ld[~np.isnan(ld)]
     ad = reshift(ad[~np.isnan(ad)]) 
-
     if collapse:
         e_y = np.linspace(-36.5, 36.5, 74)
-        e_x = np.linspace(-0.5, 180.5, 182)
+        e_x = np.linspace(0, 180, 181)
         H = makeHist(abs(ad), ld, fit=fit, bins=[e_y, e_x])
         '''
         H[:,0]*=2  
@@ -84,13 +83,7 @@ def makeHist(x_val, y_val, fit=spline_base.fit2d,
     y_val = y_val[~np.isnan(y_val)]
     x_val = x_val[~np.isnan(x_val)]
     
-    samples = zip(y_val, x_val)
-    #pdb.set_trace()
     K, xedges, yedges = np.histogram2d(y_val, x_val, bins=bins)
-    '''
-    K[:,0]*=2  
-    K[:,-1]*=2  
-    '''
     K = K / K.sum()
 
     if (fit is None):
@@ -98,6 +91,7 @@ def makeHist(x_val, y_val, fit=spline_base.fit2d,
     
     # Check if given attr is a function
     elif hasattr(fit, '__call__'):
+        samples = zip(y_val, x_val)
         H = fit(np.array(samples), bins[0], bins[1], p_est=K)[0]
         return H/H.sum()
         
@@ -185,7 +179,6 @@ class FixGen(AbstractSim):
         self.firstLenAng_cumsum, self.firstLenAng_shape = (
                                         compute_cumsum(firstSacDist(self.fm)))
                                            
-        print firstSacDist(self.fm).shape                                       
         self.probability_cumsum = []
        
         for i in range(len(self.full_H1)):
