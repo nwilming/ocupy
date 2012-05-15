@@ -106,9 +106,6 @@ class FixMat(object):
         Notes:
             See fixmat.filter for more info.
         """
-        #if isinstance(key, IntType):
-        #    self._categories[key]
-        #else:
         return self.filter(key)
             
     def filter(self, index):
@@ -136,6 +133,13 @@ class FixMat(object):
         
         """
         return FixMat(categories=self._categories, fixmat=self, index=index)
+
+    def copy(self):
+        """
+        Returns a copy of the fixmat.
+        """
+        return self.filter(np.ones(self._num_fix).astype(bool))
+
 
     def field(self, fieldname):
         """
@@ -311,9 +315,10 @@ class FixMat(object):
         self._fields = new_fields
         # Subjectindices must be unique, if indices in f_current are contained
         # in f_all set them to an arbitrary number
-        if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
-            fm_new.SUBJECTINDEX = np.ones(fm_new.SUBJECTINDEX.shape) * \
-            (max(self.SUBJECTINDEX)+1)
+        if 'SUBJECTINDEX' in new_fields:
+            if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
+                fm_new.SUBJECTINDEX = np.ones(fm_new.SUBJECTINDEX.shape) * \
+                (max(self.SUBJECTINDEX)+1)
         
         # Concatenate fields
         for field in self._fields:
