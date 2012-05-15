@@ -65,9 +65,13 @@ class FixMat(object):
                 self._parameters[param] = self.__dict__[param]
             self._num_fix = index.sum()
     
+    def __len__(self):
+        """return the length of the fixmat's fields."""
+        return self._num_fix
+
     def __str__(self):
         desc = "Fixmat with %i fixations and the following data fields:\n" % (
-                                                                    self._num_fix)
+                                                                 self._num_fix)
         desc += "%s | %s | %s | %s \n" % ('Field Name'.rjust(20),
                                           'Length'.center(13), 
                                           'Type'.center(10), 
