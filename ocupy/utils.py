@@ -5,6 +5,7 @@ from scipy.misc import toimage, fromimage
 from numpy import asarray
 import numpy as np
 
+import cPickle
 
 def imresize(arr, newsize, interp='bicubic', mode=None):
     """
@@ -129,3 +130,18 @@ def dict_fun(data, function):
     result[key] = function(data[key])
     """
     return dict((k, function(v)) for k, v in data.items())
+
+class Memoize:
+    """
+    Memoize with mutable arguments
+    """
+    def __init__(self, function):
+        self.function = function
+        self.memory = {}
+
+    def __call__(self, *args, **kwargs):
+        hash_str = cPickle.dumps(args) + cPickle.dumps(kwargs)
+        if not hash_str in self.memory:
+            self.memory[hash_str] = self.function(*args, **kwargs)
+        return self.memory[hash_str]
+

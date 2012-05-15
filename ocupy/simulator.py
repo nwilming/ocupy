@@ -1,15 +1,105 @@
-#!/usr/bin/env python
+
 """This module implements a generator of data 
 with given second-order dependencies"""
 
-from math import radians, ceil, cos, sin 
+from math import radians, ceil, floor, cos, sin 
 import random
 import ocupy
 from ocupy import fixmat
 import spline_base
 import numpy as np
+import pdb
+import cPickle
+from progressbar import ProgressBar, Percentage, Bar
 
-class FixGen(object):
+
+class AbstractSim(object):
+    """
+    Abstract Object for Simulator creation
+    """
+    def __init__(self):
+        raise NotImplementedError
+    def sample(self):
+        raise NotImplementedError
+    def parameters(self):
+        raise NotImplementedError
+
+def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.fit2d):
+    """
+    Histograms and performs a spline fit on the given data, 
+    usually angle and length differences.
+    
+    Parameters:
+        ad : array
+            The data to be histogrammed along the x-axis. 
+            May range from -180 to 180.
+        ld : array
+            The data to be histogrammed along the y-axis.
+            May range from -36 to 36.
+        collapse : boolean
+            If true, the histogrammed data will include 
+            negative values on the x-axis. Else, the histogram
+            will be folded along x = 0, and thus contain only 
+            positive elements
+        fit : function or None, optional
+            The function to use in order to fit the data. 
+            If no fit should be applied, set to None
+    """
+
+    ld = ld[~np.isnan(ld)]
+    ad = reshift(ad[~np.isnan(ad)]) 
+    if collapse:
+        e_y = np.linspace(-36.5, 36.5, 74)
+        e_x = np.linspace(0, 180, 181)
+        H = makeHist(abs(ad), ld, fit=fit, bins=[e_y, e_x])
+        '''
+        H[:,0]*=2  
+        H[:,-1]*=2
+        '''
+        return H
+    else:
+        e_x = np.linspace(-180.5, 179.5, 361)
+        e_y = np.linspace(-36.5, 36.5, 74)
+        ad[ad > 179.5] -= 360
+        return makeHist(ad, ld, fit=fit, bins=[e_y, e_x])
+
+def makeHist(x_val, y_val, fit=spline_base.fit2d, 
+            bins=[np.linspace(-36.5,36.5,74),np.linspace(-180.5,180.5,362)]):
+    """
+    Constructs a (fitted) histogram of the given data.
+    
+    Parameters:
+        x_val : array
+            The data to be histogrammed along the x-axis. 
+        y_val : array
+            The data to be histogrammed along the y-axis.
+        fit : function or None, optional
+            The function to use in order to fit the data. 
+            If no fit should be applied, set to None
+        bins : touple of arrays, giving the bin edges to be 
+            used in the histogram. (First value: y-axis, Second value: x-axis)
+    """
+    
+    y_val = y_val[~np.isnan(y_val)]
+    x_val = x_val[~np.isnan(x_val)]
+    
+    K, xedges, yedges = np.histogram2d(y_val, x_val, bins=bins)
+    K = K / K.sum()
+
+    if (fit is None):
+        return K
+    
+    # Check if given attr is a function
+    elif hasattr(fit, '__call__'):
+        samples = zip(y_val, x_val)
+        H = fit(np.array(samples), bins[0], bins[1], p_est=K)[0]
+        return H/H.sum()
+        
+    else:
+        raise TypeError("Not a valid argument, insert spline function or None")
+
+
+class FixGen(AbstractSim):
     """
     Generates fixation data.
     The FixGen object creates a representation of the second order dependence 
@@ -44,9 +134,11 @@ class FixGen(object):
             raise TypeError("Not a valid argument, insert fixmat")
 
         self.firstfixcentered = firstfixcentered
+        self.nosamples = []
+        self.noDist = 0
                     
         
-    def initialize_data(self, fit=spline_base.spline_pdf, full_H1=None):
+    def initializeData(self, fit=spline_base.fit2d, full_H1=None):
         """
         Prepares the data to be replicated. Calculates the second-order length 
         and angle dependencies between saccades and stores them in a fitted 
@@ -59,18 +151,42 @@ class FixGen(object):
                 Where applicable, the distribution of angle and length
                 differences to replicate with dimensions [73,361]
         """
-        ad, ld = anglendiff(self.fm, roll=1) 
-                
-        if full_H1 is None:
-            self.full_H1 = make_angle_length_hist(ad[0], 
-                        ld[0]/self.fm.pixels_per_degree,
-                        collapse=False, fit=fit)
+        a, l, ad, ld = anglendiff(self.fm, roll=1, return_abs = True)
+        
+        samples = np.zeros([3, len(l[0])])
+        samples[0] = l[0]/45
+        samples[1] = np.roll(l[0]/45,-1)
+        samples[2] = np.roll(reshift(ad[0]),-1)
+        z = np.any(np.isnan(samples), axis=0)
+        samples = samples[:,~np.isnan(samples).any(0)]
+            
+        
+        if full_H1 is None:   
+            self.full_H1 = []
+            screen_diag = ((self.fm.image_size[0]**2+self.fm.image_size[1]**2)**.5)/45
+            for i in range(1, int(ceil(screen_diag))):
+                idx = np.logical_and(samples[0]<=i, samples[0]>i-1)
+                if idx.any() == True:
+                    self.full_H1.append(makeHist(samples[2][idx], samples[1][idx], fit=fit, 
+                                                bins=[np.linspace(-0.5,36.5,38),np.linspace(-180.5,180.5,362)]))
+    
+                    self.nosamples.append(len(samples[2][idx]))
+                else:
+                    self.full_H1.append(np.array([]))
+                    self.nosamples.append([0])
         else:
             self.full_H1 = full_H1
-        
-        self.firstLenAng_cumsum, self.firstLenAng_shape = compute_cumsum(
-                first_saccade_dist(self.fm))
-        self.probability_cumsum = np.cumsum(self.full_H1.flat)
+                
+        self.firstLenAng_cumsum, self.firstLenAng_shape = (
+                                        compute_cumsum(firstSacDist(self.fm)))
+                                           
+        self.probability_cumsum = []
+       
+        for i in range(len(self.full_H1)):
+            if self.full_H1[i] == []:
+                self.probability_cumsum.append(np.array([]))
+            else:
+                self.probability_cumsum.append(np.cumsum(self.full_H1[i].flat))
         
         self.firstcoo_cumsum = compute_cumsum(first_fixation_coordinates(
             self.fm))[0]
@@ -79,7 +195,11 @@ class FixGen(object):
         # Counters for saccades that have to be canceled during the process
         self.canceled = 0
         self.minusSaccades = 0
-        self.drawn = []
+        self.drawnAngDiff = []  # XXX: DELETE UNUSED VARS
+        self.drawnAng = []
+        self.drawnLen = []
+        self.firstLen = []
+        self.firstAng = []
         
         
                    
@@ -101,14 +221,33 @@ class FixGen(object):
         if (prev_angle is None) or (prev_length is None):
             (length, angle)= np.unravel_index(draw_from(self.firstLenAng_cumsum),
                                                 self.firstLenAng_shape)
-            angle = angle-((self.firstLenAng_shape[1]-1)/2)
+            angle = angle-180  # XXX: ADJUST
+            self.firstAng.append(angle) # XXX: DELETE
+            #angle = angle-((self.firstLenAng_shape[1]-1)/2) 
+            length+=0.5
+            length*=self.fm.pixels_per_degree
+            self.firstLen.append(length)  # XXX: DELETE
         else:
-            J, I = np.unravel_index(draw_from(self.probability_cumsum), 
-                                    self.full_H1.shape)
-            angle = reshift((I-self.full_H1.shape[1]/2) + prev_angle)
-            self.drawn = np.append(self.drawn, J)
-            length = prev_length + \
-                    ((J-self.full_H1.shape[0]/2)*self.fm.pixels_per_degree)
+            ind = int(floor(prev_length/45))
+            while ind >= len(self.probability_cumsum):
+                ind -= 1
+                self.noDist += 1
+
+            while not(self.probability_cumsum[ind]).any():
+                ind -= 1
+                self.noDist += 1
+                
+            J, I = np.unravel_index(drawFrom(self.probability_cumsum[ind]), 
+                                    self.full_H1[ind].shape)
+            angle = reshift((I-180)+prev_angle)  # XXX: Make more general (see line below)
+            #angle = reshift((I-self.full_H1[ind].shape[1]/2) + prev_angle)
+            self.drawnAngDiff.append(I)
+            self.drawnAng.append(angle)
+            #import pylab as pp
+            #pp.plot(self.probability_cumsum[ind])
+            length = J+0.5
+            length *= self.fm.pixels_per_degree
+            self.drawnLen.append(length)
         return angle, length
     
     def parameters(self):
@@ -127,13 +266,17 @@ class FixGen(object):
         y = []
         fix = []
         sample = []
-
+        
+        # XXX: Delete ProgressBar
+        pbar = ProgressBar(widgets=[Percentage(),Bar()], maxval=num_samples).start()
+        
         for s in xrange(0, num_samples):
             for i, (xs, ys) in enumerate(self.sample()):
                 x.append(xs)
                 y.append(ys)
                 fix.append(i+1)
-                sample.append(s)   
+                sample.append(s)
+            pbar.update(s+1)
             
         fields = {'fix':np.array(fix), 'y':np.array(y), 'x':np.array(x)}
         param = {'image_size':self.fm.image_size,
@@ -335,9 +478,9 @@ def first_saccade_dist(fm):
                 The fixation data to be analysed
     
     """  
-    ang, leng, _, _ = anglendiff(fm, return_abs=True)
-    screen_diag = int(ceil((fm.image_size[0]**2 + fm.image_size[1]**2)**0.5))
-    y_arg = leng[0][np.roll(fm.fix == min(fm.fix), 1)]
+    ang, leng, ad, ld = anglendiff(fm, return_abs=True)
+    screen_diag = int(ceil((fm.image_size[0]**2 + fm.image_size[1]**2)**0.5))/fm.pixels_per_degree
+    y_arg = leng[0][np.roll(fm.fix == min(fm.fix), 1)]/fm.pixels_per_degree
     x_arg = reshift(ang[0][np.roll(fm.fix == min(fm.fix), 1)])
     bins = [range(screen_diag+1), np.linspace(-180.5, 180.5, 362)]
     return make_hist(x_arg, y_arg, fit=None, bins = bins)
@@ -412,6 +555,14 @@ def reshift(I):
     # Output -180 to +180
     if type(I)==list:
         I = np.array(I)
+    '''
+    if type(I)==np.ndarray:    
+        I[np.logical_or(I<-180.5, I>180.5)]  = (((I[np.logical_or(I<-180.5, I>180.5)])-180)%360)-180
+    if type(I)==int or type(I)==float:
+        if np.logical_or(I<-180.5, I>180.5):
+            I = ((I-180)%360)-180
+    '''
+    
     return ((I-180)%360)-180
 
 def calc_xy((x, y), angle, length):

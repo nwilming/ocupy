@@ -51,16 +51,15 @@ class FixMat(object):
         self._subjects = []
         self._fields = []
         self._categories = categories
-        self._parameters = {}
         if fixmat is not None and index is not None:
             index = index.reshape(-1,).astype(bool)
             assert index.shape[0] == fixmat._num_fix, ("Index vector for " +
                 "filtering has to have the same length as the fields of the fixmat")
             self._subjects = fixmat._subjects
-            self._fields = fixmat._fields
+            self._fields = [field for field in fixmat._fields]
             for  field in self._fields:
                 self.__dict__[field] = fixmat.__dict__[field][index]
-            self._parameters = fixmat._parameters
+            self._parameters = {}
             for (param, value) in fixmat._parameters.iteritems():
                 self.__dict__[param] = value
                 self._parameters[param] = self.__dict__[param]
@@ -501,11 +500,9 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
     # image category must exist (>-1) and image_size must be non-empty
     assert (len(fixmat.image_size) == 2 and (fixmat.image_size[0] > 0) and
         (fixmat.image_size[1] > 0)), 'The image_size is either 0, or not 2D'
-    assert fixmat.pixels_per_degree, 'Fixmat has to have a pixels_per_degree field'
     # check whether fixmat contains fixations
-    if fixmat._num_fix == 0 or len( fixmat.x) == 0 or len(fixmat.y) == 0 :
+    if fixmat._num_fix == 0 or len(fixmat.x) == 0 or len(fixmat.y) == 0 :
         raise NoFixations('There are no fixations in the fixmat.')
-
     assert not scale_factor <= 0, "scale_factor has to be > 0"
     # this specifies left edges of the histogram bins, i.e. fixations between
     # ]0 binedge[0]] are included. --> fixations are ceiled
@@ -593,11 +590,10 @@ def DirectoryFixmatFactory(directory, categories = None, glob_str = '*.mat'):
     if len(files) == 0:
         raise ValueError("Could not find any fixmats in " + 
             join(directory, glob_str))
-    f_all = FixmatFactory(join(files.pop()), categories)
+    f_all = FixmatFactory(files.pop(), categories)
     for fname in files:
-        f_current = FixmatFactory(join(directory, fname), categories)
+        f_current = FixmatFactory(fname, categories)
         f_all.join(f_current)
-
     return f_all
 
 
