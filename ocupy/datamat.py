@@ -6,9 +6,9 @@ import h5py
 
 class DataMat(object):
     """
-    Represents fixation data. 
-    The datamat object presents the fixation data as lists of values to the 
-    user. In general fixation data consists of datapoints that have several
+    Represents structured data (i.e. fixations). 
+    The datamat object presents data as lists of values to the 
+    user. In general datamats consists of datapoints that have several
     attributes. A fixation for example has a x and y position, but is also
     associated with the image that was being viewed while the fixation
     was made. The data can be accessed as attributes of the datamat::
@@ -106,7 +106,7 @@ class DataMat(object):
         
         This function is a device to filter the datamat by certain logical 
         conditions. It takes as input a logical array (contains only True
-        or False for every fixation) and kicks out all datapoints for which
+        or False for every datapoint) and kicks out all datapoints for which
         the array says False. The logical array can conveniently be created
         with numpy::
         
