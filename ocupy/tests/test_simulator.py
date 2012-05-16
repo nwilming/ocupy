@@ -39,14 +39,14 @@ class TestSimulator(unittest.TestCase):
         
             # Create artificial fixmat with fixed angle differences
             for j in range(len(fm.x)-1):
-                coord.append(gen._calc_xy(coord[-1], cur_angle[-1], length))
+                coord.append(simulator.calc_xy(coord[-1], cur_angle[-1], length))
                 cur_angle.append(cur_angle[-1]+angle)
                 
             fm.x = np.array([x[0] for x in coord])
             fm.y = np.array([x[1] for x in coord])
             
             #XXX Parameter should be None, not "None"
-            gen.initializeData(fit='None')
+            gen.initialize_data(fit=None)
             
             # Use anglendiff to calculate angles and angle_diff
             a, l, ad, ld = simulator.anglendiff(fm, return_abs=True)
