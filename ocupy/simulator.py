@@ -11,8 +11,40 @@ import numpy as np
 import pdb
 import cPickle
 from progressbar import ProgressBar, Percentage, Bar
+import functools  
+import simulator
 
-
+class memoize(object):
+    '''Decorator. Caches a function's return value each time it is called.
+    If called later with the same arguments, the cached value is returned 
+    (not reevaluated).
+    '''
+      
+    def __init__(self, func):
+        self.func = func
+        self.cache = {}
+        
+    def __call__(self,x, cumsum, r):
+        try:
+            return self.cache[cumsum][r]
+        except KeyError:
+            value = self.func(x,cumsum, r)
+            try:
+                self.cache[cumsum][r] = value
+            except KeyError:
+                self.cache[cumsum] = {r:value}
+            return value
+        except TypeError:
+            # uncachable -- for instance, passing a list as an argument.
+            # Better to not cache than to blow up entirely.
+            return self.func(cumsum,r)
+    def __repr__(self):
+        '''Return the function's docstring.'''
+        return self.func.__doc__
+    def __get__(self, obj, objtype):        
+        '''Support instance methods.'''
+        return functools.partial(self.__call__, obj)
+        
 class AbstractSim(object):
     """
     Abstract Object for Simulator creation
@@ -23,87 +55,6 @@ class AbstractSim(object):
         raise NotImplementedError
     def parameters(self):
         raise NotImplementedError
-
-def makeAngLenHist(ad, ld, collapse=True, fit=spline_base.fit2d):
-    """
-    Histograms and performs a spline fit on the given data, 
-    usually angle and length differences.
-    
-    Parameters:
-        ad : array
-            The data to be histogrammed along the x-axis. 
-            May range from -180 to 180.
-        ld : array
-            The data to be histogrammed along the y-axis.
-            May range from -36 to 36.
-        collapse : boolean
-            If true, the histogrammed data will include 
-            negative values on the x-axis. Else, the histogram
-            will be folded along x = 0, and thus contain only 
-            positive elements
-        fit : function or None, optional
-            The function to use in order to fit the data. 
-            If no fit should be applied, set to None
-    """
-
-    ld = ld[~np.isnan(ld)]
-    ad = reshift(ad[~np.isnan(ad)]) 
-
-    if collapse:
-        e_y = np.linspace(-36.5, 36.5, 74)
-        e_x = np.linspace(-0.5, 180.5, 182)
-        H = makeHist(abs(ad), ld, fit=fit, bins=[e_y, e_x])
-        '''
-        H[:,0]*=2  
-        H[:,-1]*=2
-        '''
-        return H
-    else:
-        e_x = np.linspace(-180.5, 179.5, 361)
-        e_y = np.linspace(-36.5, 36.5, 74)
-        ad[ad > 179.5] -= 360
-        return makeHist(ad, ld, fit=fit, bins=[e_y, e_x])
-
-def makeHist(x_val, y_val, fit=spline_base.fit2d, 
-            bins=[np.linspace(-36.5,36.5,74),np.linspace(-180.5,180.5,362)]):
-    """
-    Constructs a (fitted) histogram of the given data.
-    
-    Parameters:
-        x_val : array
-            The data to be histogrammed along the x-axis. 
-        y_val : array
-            The data to be histogrammed along the y-axis.
-        fit : function or None, optional
-            The function to use in order to fit the data. 
-            If no fit should be applied, set to None
-        bins : touple of arrays, giving the bin edges to be 
-            used in the histogram. (First value: y-axis, Second value: x-axis)
-    """
-    
-    y_val = y_val[~np.isnan(y_val)]
-    x_val = x_val[~np.isnan(x_val)]
-    
-    samples = zip(y_val, x_val)
-    #pdb.set_trace()
-    K, xedges, yedges = np.histogram2d(y_val, x_val, bins=bins)
-    '''
-    K[:,0]*=2  
-    K[:,-1]*=2  
-    '''
-    K = K / K.sum()
-
-    if (fit is None):
-        return K
-    
-    # Check if given attr is a function
-    elif hasattr(fit, '__call__'):
-        H = fit(np.array(samples), bins[0], bins[1], p_est=K)[0]
-        return H/H.sum()
-        
-    else:
-        raise TypeError("Not a valid argument, insert spline function or None")
-
 
 class FixGen(AbstractSim):
     """
@@ -120,31 +71,24 @@ class FixGen(AbstractSim):
     
     Separating this time-consuming step from the initialization is helpful in cases of 
     parallelization.
-    Data is generated upon calling the method sample_many(num_samples = 1000).  
+    Data is generated upon calling the method sample_many(num_samples = X).  
     """
-    def __init__(self, fm, firstfixcentered=False):
+    def __init__(self, fm):
         """
         Creates a new FixGen object upon a certain fixmat
         
         Parameters: 
             fm: ocupy.fixmat
                 The fixation data to replicate in fixmat format.
-            firstfixcentered: boolean, optional
-                If the first fixation was always kept centered in the given fixmat, 
-                change this attribute (independent of whether or not this first 
-                fixation was actually deleted from the given fixmat)
         """
         if type(fm)==ocupy.fixmat.FixMat:
             self.fm = fm
         else:
             raise TypeError("Not a valid argument, insert fixmat")
 
-        self.firstfixcentered = firstfixcentered
         self.nosamples = []
-        self.noDist = 0
-                    
         
-    def initializeData(self, fit=spline_base.fit2d, full_H1=None):
+    def initializeData(self, fit = None, full_H1=None, max_length = 40, in_deg = True):
         """
         Prepares the data to be replicated. Calculates the second-order length and angle
         dependencies between saccades and stores them in a fitted histogram.
@@ -157,35 +101,37 @@ class FixGen(AbstractSim):
                 differences to replicate with dimensions [73,361]
         """
         a, l, ad, ld = anglendiff(self.fm, roll=1, return_abs = True)
-        
+        if in_deg:
+            self.fm.pixels_per_degree = 1
+            
         samples = np.zeros([3, len(l[0])])
-        samples[0] = l[0]/45
-        samples[1] = np.roll(l[0]/45,-1)
+        samples[0] = l[0]/self.fm.pixels_per_degree
+        samples[1] = np.roll(l[0]/self.fm.pixels_per_degree,-1)
         samples[2] = np.roll(reshift(ad[0]),-1)
         z = np.any(np.isnan(samples), axis=0)
         samples = samples[:,~np.isnan(samples).any(0)]
-            
-        
+           
         if full_H1 is None:   
             self.full_H1 = []
-            screen_diag = ((self.fm.image_size[0]**2+self.fm.image_size[1]**2)**.5)/45
-            for i in range(1, int(ceil(screen_diag))):
+            for i in range(1, int(ceil(max_length+1))):
                 idx = np.logical_and(samples[0]<=i, samples[0]>i-1)
-                if idx.any() == True:
+                if idx.any():
                     self.full_H1.append(makeHist(samples[2][idx], samples[1][idx], fit=fit, 
-                                                bins=[np.linspace(-0.5,36.5,38),np.linspace(-180.5,180.5,362)]))
-    
+                                                bins=[np.linspace(0,max_length-1,max_length),np.linspace(-180,180,361)]))
+                    # Sometimes if there's only one sample present there seems to occur a problem
+                    # with histogram calculation and the hist is filled with nans. In this case, dismiss
+                    # the hist.
+                    if np.isnan(self.full_H1[-1]).any():
+                        self.full_H1[-1] = np.array([])
                     self.nosamples.append(len(samples[2][idx]))
                 else:
                     self.full_H1.append(np.array([]))
-                    self.nosamples.append([0])
+                    self.nosamples.append(0)
         else:
             self.full_H1 = full_H1
                 
         self.firstLenAng_cumsum, self.firstLenAng_shape = (
                                         compute_cumsum(firstSacDist(self.fm)))
-                                           
-        print firstSacDist(self.fm).shape                                       
         self.probability_cumsum = []
        
         for i in range(len(self.full_H1)):
@@ -193,19 +139,21 @@ class FixGen(AbstractSim):
                 self.probability_cumsum.append(np.array([]))
             else:
                 self.probability_cumsum.append(np.cumsum(self.full_H1[i].flat))
-        
-        self.firstcoo_cumsum = compute_cumsum(firstCooDist(self.fm))[0]
+               
         self.trajLen_cumsum, self.trajLen_borders = trajLenDist(self.fm)
         
-        # Counters for saccades that have to be canceled during the process
-        self.canceled = 0
-        self.minusSaccades = 0
-        self.drawnAngDiff = []  # XXX: DELETE UNUSED VARS
-        self.drawnAng = []
-        self.drawnLen = []
-        self.firstLen = []
-        self.firstAng = []
+        min_distance = 1/np.array([min((np.unique(self.probability_cumsum[i]) \
+                        -np.roll(np.unique(self.probability_cumsum[i]),1))[1:]) \
+                        for i in range(len(self.probability_cumsum))])
+        # Set a minimal resolution
+        min_distance[min_distance<10] = 10
+
+        self.linind = {}
+        for i in range(len(self.probability_cumsum)):
+            self.linind['self.probability_cumsum '+repr(i)] = np.linspace(0,1,min_distance[i])[0:-1]
         
+        for elem in ['self.firstLenAng_cumsum', 'self.trajLen_cumsum']:
+            self.linind[elem] = np.linspace(0, 1, 1/min((np.unique(eval(elem))-np.roll(np.unique(eval(elem)),1))[1:]))[0:-1]
         
     def _calc_xy(self, (x, y), angle, length):
         """
@@ -222,7 +170,8 @@ class FixGen(AbstractSim):
         """
         return (x+(cos(radians(angle))*length),
                 y+(sin(radians(angle))*length))
-               
+                
+              
     def _draw(self, prev_angle = None, prev_length = None):
         """
         Draws a new length- and angle-difference pair and calculates
@@ -239,40 +188,55 @@ class FixGen(AbstractSim):
         """
         
         if (prev_angle is None) or (prev_length is None):
-            (length, angle)= np.unravel_index(drawFrom(self.firstLenAng_cumsum),
+            (length, angle)= np.unravel_index(self.drawFrom('self.firstLenAng_cumsum', self.getrand('self.firstLenAng_cumsum')),
                                                 self.firstLenAng_shape)
-            angle = angle-180  # XXX: ADJUST
-            self.firstAng.append(angle) # XXX: DELETE
-            #angle = angle-((self.firstLenAng_shape[1]-1)/2) 
-            length+=0.5
-            length*=self.fm.pixels_per_degree
-            self.firstLen.append(length)  # XXX: DELETE
+            angle = angle-((self.firstLenAng_shape[1]-1)/2) 
+            angle += 0.5
+            length += 0.5
+            length *= self.fm.pixels_per_degree
         else:
-            ind = int(floor(prev_length/45))
+            ind = int(floor(prev_length/self.fm.pixels_per_degree))
             while ind >= len(self.probability_cumsum):
                 ind -= 1
-                self.noDist += 1
 
             while not(self.probability_cumsum[ind]).any():
                 ind -= 1
-                self.noDist += 1
                 
-            J, I = np.unravel_index(drawFrom(self.probability_cumsum[ind]), 
+            J, I = np.unravel_index(self.drawFrom('self.probability_cumsum '+repr(ind),self.getrand('self.probability_cumsum '+repr(ind))), 
                                     self.full_H1[ind].shape)
-            angle = reshift((I-180)+prev_angle)  # XXX: Make more general (see line below)
-            #angle = reshift((I-self.full_H1[ind].shape[1]/2) + prev_angle)
-            self.drawnAngDiff.append(I)
-            self.drawnAng.append(angle)
-            #import pylab as pp
-            #pp.plot(self.probability_cumsum[ind])
+            angle = reshift((I-self.full_H1[ind].shape[1]/2) + prev_angle)
+            angle += 0.5
             length = J+0.5
             length *= self.fm.pixels_per_degree
-            self.drawnLen.append(length)
         return angle, length
     
     def parameters(self):
         return {'fixmat':self.fm, 'sampling_dist':self.full_H1}
 
+    def generate(self, num_samples = 10000, multiproc = False):
+        if multiproc:
+            from multiprocessing import Pool, cpu_count
+            try:
+                cores = cpu_count()
+            except NotImplementedError:
+                cores = 4
+                
+            arguments = []
+            for i in range(cores):
+                arguments.append((simulator.FixGen(self.fm),num_samples/cores))
+                
+            pool = Pool(processes = cores)
+            fms = pool.map(multiprocess, arguments)
+            out = fms[0]
+            out.SUBJECTINDEX = [0]*len(out.x) # Delete SUBJECTINDEX-stuff after update of ocupy.
+            for i in range(1,len(fms)):
+                fms[i].SUBJECTINDEX = [i]*len(fms[i].x)
+                out.join(fms[i])
+            return out
+            
+        else: 
+            return self.sample_many(num_samples = num_samples)
+            
     def sample_many(self, num_samples = 2000):
         """
         Generates a given number of trajectories, using the method sample(). 
@@ -299,8 +263,7 @@ class FixGen(AbstractSim):
             pbar.update(s+1)
             
         fields = {'fix':np.array(fix), 'y':np.array(y), 'x':np.array(x)}
-        param = {'image_size':self.fm.image_size,
-                'pixels_per_degree':self.fm.pixels_per_degree}
+        param = {'pixels_per_degree':self.fm.pixels_per_degree}
         out =  fixmat.VectorFixmatFactory(fields, param)
         return out
     
@@ -314,16 +277,11 @@ class FixGen(AbstractSim):
         angles = []
         coordinates = []
         fix = []
-        sample_size = int(round(drawFrom(self.trajLen_cumsum, 
-                            borders=self.trajLen_borders)))
-        
-        if (self.firstfixcentered == True):
-            coordinates.append([self.fm.image_size[1]/2, self.fm.image_size[0]/2])
-        else:
-            K, L = (np.unravel_index(drawFrom(self.firstcoo_cumsum),
-                                [self.fm.image_size[0],self.fm.image_size[1]]))
-            coordinates.append([L, K])
+        sample_size = int(round(self.trajLen_borders[self.drawFrom('self.trajLen_cumsum', self.getrand('self.trajLen_cumsum'))]))
+
+        coordinates.append([0, 0])
         fix.append(1)
+        
         while len(coordinates) < sample_size:
             if len(lenghts) == 0 and len(angles) == 0:          
                 angle, length = self._draw(self)
@@ -333,17 +291,154 @@ class FixGen(AbstractSim):
                         
             x, y = self._calc_xy(coordinates[-1], angle, length) 
             
-            if (length<0):
-                self.minusSaccades += 1 # Drawn saccade length not possible
-            else:
-                coordinates.append([x, y])
-                lenghts.append(length) 
-                angles.append(angle)
-                fix.append(fix[-1]+1)
+            coordinates.append([x, y])
+            lenghts.append(length) 
+            angles.append(angle)
+            fix.append(fix[-1]+1)
         return coordinates
     
+    def getrand(self, name):
+        return random.choice(self.linind[name])
+ 
+    @memoize    
+    def drawFrom(self, cumsum, r):
+        """
+        Draws a value from a cumulative sum.
+        
+        Parameters: 
+            cumsum : array
+                Cumulative sum from which shall be drawn.
+
+        Returns:
+            int : Index of the cumulative sum element drawn.
+        """
+        a = cumsum.rsplit()
+        if len(a)>1:
+            b = eval(a[0])[int(a[1])]
+        else:
+            b = eval(a[0])
             
-def anglendiff(fm, roll = 1, return_abs=False):
+        return np.nonzero(b>=r)[0][0]
+        
+def multiprocess(arguments):
+    (sim, numsamples) = arguments
+    sim.initializeData()
+    return sim.sample_many(num_samples = numsamples)
+
+def makeAngLenHist(ad, ld, fm = None, collapse=True, fit=spline_base.fit2d):
+    """
+    Histograms and performs a spline fit on the given data, 
+    usually angle and length differences.
+    
+    Parameters:
+        ad : array
+            The data to be histogrammed along the x-axis. 
+            May range from -180 to 180.
+        ld : array
+            The data to be histogrammed along the y-axis.
+            May range from -36 to 36.
+        collapse : boolean
+            If true, the histogrammed data will include 
+            negative values on the x-axis. Else, the histogram
+            will be collapsed along x = 0, and thus contain only 
+            positive angle differences
+        fit : function or None, optional
+            The function to use in order to fit the data. 
+            If no fit should be applied, set to None
+        fm  : fixmat or None, optional
+            If given, the angle and length differences are calculated
+            from the fixmat and the previous parameters are overwritten.
+    """
+    
+    if fm:
+        ad,ld = anglendiff(fm, roll=2)
+        ad, ld = ad[0], ld[0]
+        
+    ld = ld[~np.isnan(ld)]
+    ad = reshift(ad[~np.isnan(ad)])
+
+    if collapse:
+        e_y = np.linspace(-36.5, 36.5, 74)
+        e_x = np.linspace(0, 180, 181)
+        H = makeHist(abs(ad), ld, fit=fit, bins=[e_y, e_x])
+
+        H = H/H.sum()
+        
+        return H
+    else:
+        e_x = np.linspace(-180, 180, 361)
+        e_y = np.linspace(-36.5, 36.5, 74)
+        return makeHist(ad, ld, fit=fit, bins=[e_y, e_x])
+
+def makeHist(x_val, y_val, fit=spline_base.fit2d, 
+            bins=[np.linspace(-36.5,36.5,74),np.linspace(-180,180,361)]):
+    """
+    Constructs a (fitted) histogram of the given data.
+    
+    Parameters:
+        x_val : array
+            The data to be histogrammed along the x-axis. 
+        y_val : array
+            The data to be histogrammed along the y-axis.
+        fit : function or None, optional
+            The function to use in order to fit the data. 
+            If no fit should be applied, set to None
+        bins : touple of arrays, giving the bin edges to be 
+            used in the histogram. (First value: y-axis, Second value: x-axis)
+    """
+    
+    y_val = y_val[~np.isnan(y_val)]
+    x_val = x_val[~np.isnan(x_val)]
+    
+    samples = zip(y_val, x_val)
+    K, xedges, yedges = np.histogram2d(y_val, x_val, bins=bins)
+
+    if (fit is None):
+        return K/ K.sum()
+   
+    # Check if given attr is a function
+    elif hasattr(fit, '__call__'):
+        H = fit(np.array(samples), bins[0], bins[1], p_est=K)[0]
+        return H/H.sum()
+    else:
+        raise TypeError("Not a valid argument, insert spline function or None")
+        
+def shuffled_anglendiff(angles, lengths, roll = 2, return_abs = False):
+    sangle_diffs = []
+    slength_diffs = []
+    sangles = []
+    slengths = []
+    
+    index = np.random.permutation(len(angles))
+    sangles.append(angles[np.array(index)])
+    slengths.append(lengths[np.array(index)])
+    
+    sangle_diffs.append(sangles[0] - np.roll(sangles[0],1))
+    slength_diffs.append(slengths[0] - np.roll(slengths[0],1))
+    
+    # Restore height and width information from shuffled saccades using the law
+    # a/sin(alpha)=b/sin(beta). Note: All angles have to be converted back to radians.
+    tmp_sheights = np.array(slengths[0]) * np.sin(np.radians(sangles[0])) / sin(np.radians(90))
+    sheights = tmp_sheights[:]
+    # ... and using the law of tangens
+    tmp_swidths =  sheights / np.tan(np.radians(sangles[0]))
+    swidths = tmp_swidths[:]
+    
+    for r in range(2,roll+1):
+        tmp_swidths = tmp_swidths + np.roll(swidths,r-1)
+        tmp_sheights = tmp_sheights + np.roll(sheights, r-1)
+        sangles.append(np.degrees(np.arctan2(tmp_sheights,tmp_swidths)))
+        slengths.append((tmp_swidths**2+tmp_sheights**2)**.5)
+        
+        sangle_diffs.append(sangles[0] - np.roll(sangles[-1],1))
+        slength_diffs.append(slengths[0] - np.roll(slengths[-1],1)) 
+    
+    if return_abs:
+        return sangles, slengths, sangle_diffs, slength_diffs
+    else:
+        return sangle_diffs, slength_diffs
+            
+def anglendiff(fm, roll = 2, return_abs=False):
     """
     Calculates the lengths and angles of the saccades contained in the fixmat
     as well as length- and angle differences between consecutive saccades.
@@ -398,7 +493,7 @@ def anglendiff(fm, roll = 1, return_abs=False):
         
     else:
         return angle_diffs, length_diffs
-
+ 
 def compute_cumsum(H):
     """
         Computes the cumulative sum of a given 2D distribution
@@ -420,28 +515,10 @@ def firstSacDist(fm):
     
     """  
     ang, leng, ad, ld = anglendiff(fm, return_abs=True)
-    screen_diag = int(ceil((fm.image_size[0]**2 + fm.image_size[1]**2)**0.5))/fm.pixels_per_degree
     y_arg = leng[0][np.roll(fm.fix == min(fm.fix), 1)]/fm.pixels_per_degree
     x_arg = reshift(ang[0][np.roll(fm.fix == min(fm.fix), 1)])
-    bins = [range(screen_diag+1), np.linspace(-180.5, 180.5, 362)]
+    bins = [range(int(ceil(np.nanmax(y_arg)))+1), np.linspace(-180, 180, 361)]
     return makeHist(x_arg, y_arg, fit=None, bins = bins)
-    
-def firstCooDist(fm):
-    """
-        Computes the distribution of coordinates that were chosen
-        as first fixation locations
-        
-        Parameters:
-            fm : ocupy.fixmat 
-                The fixation data to be analysed
-    
-    """  
-    ind = fm.fix == min(fm.fix)
-    y_arg = fm.y[ind]
-    x_arg = fm.x[ind]
-    bins = [range(fm.image_size[0]+1), range(fm.image_size[1]+1)]
-    return makeHist(x_arg, y_arg, fit=None, bins = bins)
-
     
 def trajLenDist(fm):
     """
@@ -458,23 +535,6 @@ def trajLenDist(fm):
                     bins=np.linspace(-0.5, max(trajLen)+0.5, max(trajLen)+2))
     cumsum = np.cumsum(val.astype(float) / val.sum())
     return cumsum, borders
-    
-def drawFrom(cumsum, borders=[]):
-    """
-    Draws a value from a cumulative sum.
-    
-    Parameters: 
-        cumsum : array
-            Cumulative sum from which shall be drawn.
-        borders : array, optional
-            If given, sets the value borders for entries in the cumsum-vector.
-    Returns:
-        int : Index of the cumulative sum element drawn.
-    """
-    if len(borders)==0:
-        return (cumsum>=random.random()).nonzero()[0][0]
-    else:
-        return borders[(cumsum>=random.random()).nonzero()[0][0]]
 
 def reshift(I):
     """
@@ -496,18 +556,6 @@ def reshift(I):
     # Output -180 to +180
     if type(I)==list:
         I = np.array(I)
-    '''
-    if type(I)==np.ndarray:    
-        I[np.logical_or(I<-180.5, I>180.5)]  = (((I[np.logical_or(I<-180.5, I>180.5)])-180)%360)-180
-    if type(I)==int or type(I)==float:
-        if np.logical_or(I<-180.5, I>180.5):
-            I = ((I-180)%360)-180
-    '''
     
     return ((I-180)%360)-180
-
-if __name__ == '__main__':
-    sim = FixGen('fixmat_photos.mat')
-    #sim.set_path()
-    simfm = sim.sample_many(num_samples=6263)
 
