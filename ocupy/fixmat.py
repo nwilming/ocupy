@@ -454,24 +454,6 @@ class FixMat(object):
         return (all_act[:, 1:], all_ctrls[:, 1:]) # first column was dummy 
 
 
-def load(path):
-    """
-    Load fixmat at path.
-    
-    Parameters:
-        path : string
-            Absolute path of the file to load from.
-    """
-    f = h5py.File(path,'r')
-    fm_group = f['Fixmat']
-    fields = {}
-    params = {}
-    for field, value in fm_group.iteritems():
-        fields[field] = np.array(value)
-    for param, value in fm_group.attrs.iteritems():
-        params[param] = value
-    f.close()
-    return VectorFixmatFactory(fields, params)
 
 
 def compute_fdm(fixmat, fwhm=2, scale_factor=1):
@@ -694,6 +676,31 @@ def TestFixmatFactory(points = None, categories = [1],
         fixmat.__dict__[field] = value
     fixmat._num_fix  = len(fixmat.x)
     return fixmat
+
+def load(path):
+    """
+    Load datamat at path.
+    
+    Parameters:
+        path : string
+            Absolute path of the file to load from.
+    """
+    f = h5py.File(path,'r')
+    if 'Fixmat' in f.keys():
+        fm_group = f['Fixmat']
+    elif 'Datamat' in f.keys():
+        fm_group = f['Datamat']
+    else:
+        raise RuntimeError('HDF5 file does not contain key that I can relate to.')
+    fields = {}
+    params = {}
+    for field, value in fm_group.iteritems():
+        fields[field] = np.array(value)
+    for param, value in fm_group.attrs.iteritems():
+        params[param] = value
+    f.close()
+    return VectorFixmatFactory(fields, params)
+
 
 def VectorFixmatFactory(fields, parameters, categories = None):
     fm = FixMat(categories = categories)
