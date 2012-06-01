@@ -137,7 +137,6 @@ class FixMat(DataMat):
                 all_act = np.hstack((all_act, actuals[1:, :]))
                 all_ctrls = np.hstack((all_ctrls, controls[1:, :]))
         return (all_act[:, 1:], all_ctrls[:, 1:]) # first column was dummy 
-        
 
 def compute_fdm(fixmat, fwhm=2, scale_factor=1):
     """
@@ -359,7 +358,12 @@ def load(path):
             Absolute path of the file to load from.
     """
     f = h5py.File(path,'r')
-    fm_group = f['Datamat']
+    if 'Fixmat' in f.keys():
+        fm_group = f['Fixmat']
+    elif 'Datamat' in f.keys():
+        fm_group = f['Datamat']
+    else:
+        raise RuntimeError('HDF5 file does not contain key that I can relate to.')
     fields = {}
     params = {}
     for field, value in fm_group.iteritems():
@@ -367,7 +371,7 @@ def load(path):
     for param, value in fm_group.attrs.iteritems():
         params[param] = value
     f.close()
-    return VectorDatamatFactory(fields, params)
+    return VectorFixmatFactory(fields, params)
 
 
 def VectorFixmatFactory(fields, parameters, categories = None):
