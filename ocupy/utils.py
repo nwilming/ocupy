@@ -1,49 +1,55 @@
 #!/usr/bin/env python
 """A helper module that collects some useful auxillary functions."""
 
-from scipy.misc import toimage, fromimage #@UnresolvedImport
 from numpy import asarray
 import numpy as np
+from warnings import warn
 
+have_image_library=True
+try:
+    from scipy.misc import toimage, fromimage #@UnresolvedImport
+except ImportError:
+    have_image_library=False
 
-def imresize(arr, newsize, interp='bicubic', mode=None):
-    """
-    resize a matrix to the desired dimensions. May not always lead to best
-    behavior at borders. If possible, fixation density maps and features
-    should directly be computed in the desired size.
+if have_image_library:
+    def imresize(arr, newsize, interp='bicubic', mode=None):
+        """
+        resize a matrix to the desired dimensions. May not always lead to best
+        behavior at borders. If possible, fixation density maps and features
+        should directly be computed in the desired size.
 
-    Parameters
-    ----------
-    arr : array_like
-        Input data, in any form that can be converted to an array with at
-        least 2 dimensions
-    newsize : 2 element tupel
-        newsize[0] is the new height, newsize[1] the new width of the image
-    interp : string
-        specifies the interpolation method. Possible values are nearest, 
-        bilinear, and bicubic. Defaults to bicubic.
-    mode : string
-        specifies the mode with which arr is transformed to an image. Per
-        default, if arr is a valid (N,3) byte-array giving the RGB values
-        (from 0 to 255) then mode='P'. For 2D arrays, the data type of the
-        values is used.
+        Parameters
+        ----------
+        arr : array_like
+            Input data, in any form that can be converted to an array with at
+            least 2 dimensions
+        newsize : 2 element tupel
+            newsize[0] is the new height, newsize[1] the new width of the image
+        interp : string
+            specifies the interpolation method. Possible values are nearest, 
+            bilinear, and bicubic. Defaults to bicubic.
+        mode : string
+            specifies the mode with which arr is transformed to an image. Per
+            default, if arr is a valid (N,3) byte-array giving the RGB values
+            (from 0 to 255) then mode='P'. For 2D arrays, the data type of the
+            values is used.
 
-    Returns
-    -------
-    out : ndarray
-        The resized version of the input array
-    """
-    newsize = list(newsize)
-    newsize.reverse()
-    newsize = tuple(newsize)
-    arr = asarray(arr)
-    func = {'nearest':0, 'bilinear':2, 'bicubic':3, 'cubic':3}
-    if not mode and arr.ndim == 2:
-        mode = arr.dtype.kind.upper()
-    img = toimage(arr, mode=mode)
+        Returns
+        -------
+        out : ndarray
+            The resized version of the input array
+        """
+        newsize = list(newsize)
+        newsize.reverse()
+        newsize = tuple(newsize)
+        arr = asarray(arr)
+        func = {'nearest':0, 'bilinear':2, 'bicubic':3, 'cubic':3}
+        if not mode and arr.ndim == 2:
+            mode = arr.dtype.kind.upper()
+        img = toimage(arr, mode=mode)
 
-    img = img.resize(newsize, resample = func[interp])
-    return fromimage(img)
+        img = img.resize(newsize, resample = func[interp])
+        return fromimage(img)
 
     
 def randsample(vec, nr_samples):
@@ -72,8 +78,8 @@ def calc_resize_factor(prediction, image_size):
     
 def dict_2_mat(data, fill = True):
     """
-    Creates a numpy array from a dictionary with only integers as keys and
-    numpy arrays as values. Dimension 0 of the resulting array is formed from
+    Creates a NumPy array from a dictionary with only integers as keys and
+    NumPy arrays as values. Dimension 0 of the resulting array is formed from
     data.keys(). Missing values in keys can be filled up with np.nan (default)
     or ignored.
 
@@ -139,8 +145,9 @@ def snip_string_middle(string, max_len=20, snip_string='...'):
     >>> snip_string_middle('this is long', 8, '~')
     'thi~long'
     
-    TODO: deprecate this implementation in favour of snip_string()
+
     """
+    #warn('use snip_string() instead', DeprecationWarning)
     if len(string) <= max_len:
         new_string = string
     else:
