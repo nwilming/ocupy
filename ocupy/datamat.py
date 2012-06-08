@@ -386,7 +386,7 @@ class DataMat(object):
 
     def rm_field(self, name):
         """
-        Remove a field from the datamat.
+        Remove a field from the DataMat.
 
         Parameters:
             name : string
@@ -451,7 +451,8 @@ class DataMat(object):
         """
         Adds content of a new DataMat to this DataMat.
        
-        If a parameter of the DataMats is not equal, it is promoted to a field.
+        If a parameter of the DataMats is not equal or does not exist
+        in one, it is promoted to a field.
         
         If the two DataMats have different fields then the elements for the
         DataMats that did not have the field will be NaN, unless
@@ -469,21 +470,24 @@ class DataMat(object):
         """
         # Check if parameters are equal. If not, promote them to fields.
         for (nm, val) in self._parameters.items():
-            if fm_new._parameters.has_key(nm) and (val != fm_new._parameters[nm]):
-                #print "debug: promoting parameter '%s' to field in both DataMats..." % (nm)
-                self.parameter_to_field(nm)
-                fm_new.parameter_to_field(nm)
-            elif nm in fm_new._fields:
+            if fm_new._parameters.has_key(nm):
+                if (val != fm_new._parameters[nm]):
+                    #print "debug: promoting parameter '%s' to field in both DataMats..." % (nm)
+                    self.parameter_to_field(nm)
+                    fm_new.parameter_to_field(nm)
+            else:
                 #print "debug: promoting parameter '%s' to field in first DataMat..." % (nm)
                 self.parameter_to_field(nm)
         for (nm, val) in fm_new._parameters.items():
-            if nm in self._fields:
+            if self._parameters.has_key(nm):
+                if (val != self._parameters[nm]):
+                    #print "debug: promoting parameter '%s' to field in both DataMats..." % (nm)
+                    self.parameter_to_field(nm)
+                    fm_new.parameter_to_field(nm)
+            else:
                 #print "debug: promoting parameter '%s' to field in second DataMat..." % (nm)
                 fm_new.parameter_to_field(nm)
-            elif nm not in self._parameters:
-                #print "debug: adding parameter '%s' to first DataMat..." % (nm)
-                self.add_parameter(nm, val)
-
+        
         # Deal with mismatch in the fields
         # First those in self that do not exist in new...
         orig_fields = self._fields[:]
