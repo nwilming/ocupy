@@ -11,6 +11,7 @@ from scipy.ndimage.filters import gaussian_filter
 from utils import snip_string_middle
 
 import h5py
+from numpy import ma
 
 def isiterable(some_object):
     try:
@@ -34,13 +35,13 @@ class DataMat(object):
     associated with the image that was being viewed while the fixation
     was made. The data can be accessed as attributes of the DataMat:
 
-        >>> datamat.x    # Returns a list of x-coordinates
-        >>> datamat.y    # Returns a list of y-coordinates
+    datamat.x    # Returns a list of x-coordinates
+    datamat.y    # Returns a list of y-coordinates
 
     In this case a single index into any one of these lists represents a 
     fixation:
 
-        >>> (datamat.x[0], datamat.y[0])  
+    (datamat.x[0], datamat.y[0])  
 
     .. note:: It is never necessary to create a DataMat object directly. 
         This is handled by DataMat factories.
@@ -320,7 +321,7 @@ class DataMat(object):
         new_data.fill(np.nan)
         self.add_field(name, new_data)
 
-    def copy_field (self, src_dm, data_field, key_field):
+    def copy_field (self, src_dm, data_field, key_field, take_first=True):
         """
         Adds a new field (data_field) to the DataMat with data from the
         corresponding field of another DataMat (src_dm).
@@ -330,11 +331,19 @@ class DataMat(object):
         
         The two DataMats are essentially aligned by the unique values
         of key_field so that each block element of the new field of the target
-        DataMat will come from the first element of src_dm's data_field
+        DataMat will consist of those elements of src_dm's data_field
         where the corresponding element in key_field matches.
+        
+        If 'take_first' is not true, and there is not
+        only a single corresponding element (typical usage case) then the
+        target element value will be
+        a sequence (array) of all the matching elements.
         
         The target DataMat (self) must not have a field name data_field
         already, and both DataMats must have key_field.
+        
+        The new field in the target DataMat will be a masked array to handle
+        non-existent data.
         
         Examples:
         
@@ -358,7 +367,7 @@ class DataMat(object):
         >>> 'interospective_awareness' in dm_emotiv.fieldnames()
         True
         >>> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
-        True
+        False
         
         Added by rmuil 2012/01/31
         """
@@ -370,17 +379,30 @@ class DataMat(object):
             raise AttributeError('data field (%s) already exists in target DataMat' % (data_field))
         
         #Create a mapping of key_field value to data value.
-        data_to_copy = dict([(x.field(key_field)[0], x.field(data_field)[0]) for x in src_dm.by_field(key_field)])
+        data_to_copy = dict([(x.field(key_field)[0], x.field(data_field)) for x in src_dm.by_field(key_field)])
         
         data_element = data_to_copy.values()[0]
         
         #Create the new data array of correct size.
+        # We use a masked array because it is possible that for some elements
+        # of the target DataMat, there exist simply no data in the source
+        # DataMat. NaNs are fine as indication of this for floats, but if the
+        # field happens to hold booleans or integers or something else, NaN
+        # does not work.
         new_shape = [len(self)] + list(data_element.shape)
-        new_data = np.empty(new_shape, data_element.dtype)
+        new_data = ma.empty(new_shape, data_element.dtype)
+        new_data.mask=True
+        if np.issubdtype(new_data.dtype, np.float):
+            new_data.fill(np.NaN) #For backwards compatibility, if mask not used
         
-        new_data.fill(np.NaN)
+        #Now we copy the data. If the data to copy contains only a single value,
+        # it is added to the target as a scalar (single value).
+        # Otherwise, it is copied as is, i.e. as a sequence.
         for (key, val) in data_to_copy.iteritems():
-            new_data[self.field(key_field) == key] = val
+            if take_first:
+                new_data[self.field(key_field) == key] = val[0]
+            else:
+                new_data[self.field(key_field) == key] = val
         
         self.add_field(data_field, new_data)
 
@@ -893,3 +915,8 @@ def VectorFactory(fields, parameters, categories = None):
         fm.__dict__[field] = value
     fm._num_fix = len(fm.__dict__[fields.keys()[0]])
     return fm
+
+if __name__ == "__main__":
+
+    import doctest
+    doctest.testmod()
