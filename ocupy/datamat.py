@@ -317,8 +317,9 @@ class DataMat(object):
         #TODO: handle numpy order?
         new_shape = list(like_array.shape)
         new_shape[0] = len(self)
-        new_data = np.empty(new_shape, like_array.dtype)
-        new_data.fill(np.nan)
+        new_data = ma.empty(new_shape, like_array.dtype)
+        new_data.mask = True
+        #new_data.fill(np.nan)
         self.add_field(name, new_data)
 
     def copy_field (self, src_dm, data_field, key_field, take_first=True):
@@ -530,7 +531,7 @@ class DataMat(object):
 
         # Concatenate fields
         for field in self._fields:
-            self.__dict__[field] = np.hstack((self.__dict__[field], 
+            self.__dict__[field] = ma.hstack((self.__dict__[field], 
                 fm_new.__dict__[field]))
 
         # Update _num_fix
@@ -675,7 +676,7 @@ def load(path):
     fields = {}
     params = {}
     for field, value in fm_group.iteritems():
-        fields[field] = np.array(value)
+        fields[field] = ma.array(value)
     for param, value in fm_group.attrs.iteritems():
         params[param] = value
     f.close()
