@@ -467,7 +467,10 @@ def load(path):
             Absolute path of the file to load from.
     """
     f = h5py.File(path,'r')
-    fm_group = f['Fixmat']
+    if 'Fixmat' in f:
+      fm_group = f['Fixmat']
+    else:
+      fm_group = f['Datamat']
     fields = {}
     params = {}
     for field, value in fm_group.iteritems():
