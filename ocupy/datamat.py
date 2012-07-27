@@ -281,11 +281,6 @@ class DataMat(object):
             from one subject.
 
         """
-        # Check if new datamat has only data from one subject
-        if not len(np.unique(fm_new.SUBJECTINDEX))==1:
-            raise (RuntimeError(
-                """Can only join datamats if new datamat has data from only 
-                one subject"""))
         
         # Check if same fields are present, if not only use minimal subset
         new_fields = []
@@ -298,12 +293,6 @@ class DataMat(object):
                 # iterating over the list so reconstruct a new one
                 new_fields.append(field)
         self._fields = new_fields
-        # Subjectindices must be unique, if indices in f_current are contained
-        # in f_all set them to an arbitrary number
-        if 'SUBJECTINDEX' in new_fields:
-            if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
-                fm_new.SUBJECTINDEX = np.ones(fm_new.SUBJECTINDEX.shape) * \
-                (max(self.SUBJECTINDEX)+1)
         
         # Concatenate fields
         for field in self._fields:
