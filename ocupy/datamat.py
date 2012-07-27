@@ -299,7 +299,7 @@ class DataMat(object):
                 %name))
         if not len(data) == self._num_fix:
             raise (ValueError(
-                'Can not add field %s, data does not have correct length' 
+                'Cannot add field %s, data does not have correct length' 
                 % (name)))
         self._fields.append(name)
         self.__dict__[name] = data
@@ -310,16 +310,16 @@ class DataMat(object):
         like_array and the shape of the like_array except for the first
         dimension which will be instead the field-length of this DataMat.
         
-        The elements of the new field will be NaN.
+        The elements of the new field will be masked.
+        
+        TODO: set fill value to NaN if dtype is float.
         
         Added by rmuil 2012/01/30
         """
-        #TODO: handle numpy order?
         new_shape = list(like_array.shape)
         new_shape[0] = len(self)
         new_data = ma.empty(new_shape, like_array.dtype)
         new_data.mask = True
-        #new_data.fill(np.nan)
         self.add_field(name, new_data)
 
     def copy_field (self, src_dm, data_field, key_field, take_first=True):
@@ -407,6 +407,14 @@ class DataMat(object):
         
         self.add_field(data_field, new_data)
 
+    def flatten_field(self, name):
+        """
+        
+        Added by rmuil on 2012/07/03
+        """
+        print name
+        warn(NotImplementedError)
+        
     def rm_field(self, name):
         """
         Remove a field from the DataMat.
