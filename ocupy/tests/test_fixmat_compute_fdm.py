@@ -44,7 +44,7 @@ class TestComputeFDM(unittest.TestCase):
         """
         #returns an empty fixmat
         fm = self.fm.filter(self.fm.category == 3) 
-        self.assertRaises(fixmat.NoFixations, fixmat.compute_fdm, fm)
+        self.assertRaises(RuntimeError, fixmat.compute_fdm, fm)
 
     # tests for properties of a probability density function, i.e.
     # elements must sum to one and be in the range of [0 1]    

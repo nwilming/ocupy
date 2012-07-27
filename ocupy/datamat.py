@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """This module implements the Datamat Structure for managing data structured in blocks (i.e. eye-tracking data.)"""
-	import warnings
+import warnings
 from os.path import join
 from warnings import warn
 from glob import glob
@@ -50,14 +50,14 @@ class Datamat(object):
             index : list of True or False or an iterable, same length as fields of Datamat
                 Indicates which blocks should be used for the new Datamat and
                 which should be ignored. If index is iterable it indexes all fields
-								as if you would index a numpy array with index. The only exception is 
-								that a datamat always holds arrays, never scalar values, as fields.
+                as if you would index a numpy array with index. The only exception is 
+                that a datamat always holds arrays, never scalar values, as fields.
 
         TODO: thoroughly test that all indices work as expected (including slicing etc)
         """
         
         self._fields = []
-        self._categories = categories.copy() if categories is not None else None
+        self._categories = categories
         self._parameters = {}
         self._num_fix = 0
         #warn('this needs to be thoroughly tested for indexes that are not boolean NumPy arrays!')
@@ -497,7 +497,7 @@ class Datamat(object):
                 if minimal_subset:
                     self.rm_field(field)
                 else:
-										warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
+		    warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
                     fm_new.add_field_like(field, self.field(field))
         # ... then those in the new that do not exist in self.
         orig_fields = fm_new._fields[:]
@@ -506,7 +506,7 @@ class Datamat(object):
                 if minimal_subset:
                     fm_new.rm_field(field)
                 else:
-										warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
+	            warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
                     self.add_field_like(field, fm_new.field(field))
 
         # Concatenate fields
@@ -526,7 +526,7 @@ def load(path):
             Absolute path of the file to load from.
     """
     f = h5py.File(path,'r')
-		fm_group = f['Datamat']
+    fm_group = f['Datamat']
     fields = {}
     params = {}
     for field, value in fm_group.iteritems():

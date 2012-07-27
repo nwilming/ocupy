@@ -12,9 +12,9 @@ import numpy as np
 from scipy.io import loadmat
 from scipy.ndimage.filters import gaussian_filter
 
-from datamat import DataMat, VectorDatamatFactory
+from datamat import Datamat
 
-class FixMat(DataMat):
+class FixMat(Datamat):
 
     def add_feature_values(self, features):
         """

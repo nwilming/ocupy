@@ -3,7 +3,6 @@
 
 from numpy import asarray
 import numpy as np
-from warnings import warn
 import cPickle
 
 have_image_library=True
@@ -12,7 +11,7 @@ try:
 except ImportError:
     have_image_library=False
 
-	def isiterable(some_object):
+def isiterable(some_object):
     try:
         iter(some_object)
     except TypeError:

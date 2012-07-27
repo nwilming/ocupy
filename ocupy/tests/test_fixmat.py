@@ -77,15 +77,7 @@ class TestFixmat(unittest.TestCase):
         fm_add = fixmat.TestFixmatFactory(categories = [7], filenumbers = [10], subjectindices = [100],
                                     params = {'pixels_per_degree':10,'image_size':[100,500]})
         fm.join(fm_add)
-        fm_add2 = fixmat.TestFixmatFactory(categories = [7], filenumbers = [10], subjectindices = [100, 101],
-                                    params = {'pixels_per_degree':10,'image_size':[100,500]})
-        self.assertRaises(RuntimeError, lambda: fm.join(fm_add2))
-        fm_add = fixmat.TestFixmatFactory(categories = [7], filenumbers = [10], subjectindices = [100, 101],
-                                    params = {'pixels_per_degree':10,'image_size':[101,500]})
-        self.assertRaises(RuntimeError, lambda: fm.join(fm_add2))
 
-        fm_cmp = fm[ (fm.SUBJECTINDEX == 100) & (fm.category == 7) ]
-        self.compare_fixmats(fm_add, fm_cmp)
     
 
     def compare_fixmats(self, a, b):
