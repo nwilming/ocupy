@@ -15,6 +15,8 @@ def factorise_field(dm, field_name, boundary_char = None, parameter_name=None):
     if parameter_name is None, then it will be <field_name>_common.
     
     So far, it's probably only useful for the file_name.
+    
+    TODO: remove field entirely if no unique elements exist.
     """
     
     old_data = dm.field(field_name)
