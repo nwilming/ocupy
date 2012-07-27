@@ -5,12 +5,26 @@ import pdb
 
 import unittest
 import numpy as np
-from ocupy import fixmat, simulator
+from ocupy import fixmat
+import simulator
 import ocupy
+from tool import KLDiv, multinomial, plot_probs
+from IPython.kernel import client
 
 
 class TestSimulator(unittest.TestCase):
-    
+    '''
+    def test_init(self):
+        # XXX Better use self generated data
+        fm = fixmat.FixmatFactory('fixmat_photos.mat')
+        gen = simulator.FixGen(fm)
+        self.assertTrue(type(gen.fm)==ocupy.fixmat.FixMat)
+        # In this data, the first fixation is deleted from the set
+        self.assertTrue(gen.firstfixcentered == True)
+        
+        fm.fix-=1
+        gen = simulator.FixGen(fm)
+        self.assertTrue(gen.firstfixcentered == False)
         
     def test_anglendiff(self):
         fm = fixmat.FixmatFactory('/net/store/users/nwilming/eq/analysis/qoamp/fixmat_photos.mat')
@@ -76,10 +90,130 @@ class TestSimulator(unittest.TestCase):
         # Stripe
         K = np.zeros((73,360))
         K[:,35:37]=1
+    '''
+    def test_sim(self):
+        ### XXX: Look out for the first angles and lengths!
+        fm = fixmat.FixmatFactory('fixmat_photos.mat')
+        sim = simulator.FixGen(fm)
         
+        ### Test case 1: uniform dist
+        H = np.ones((37,361))
+        H/=H.sum()
+
+        A = []
+        for i in range(36):
+            A.append(H)
+
+        sim.initializeData(fit=None, full_H1=A)
+        ### XXX: Evtl. numsamples anpassen an die menge der benutzten bins. 
+        fixes = sim.sample_many(num_samples = 500)
+
+        sim2 = simulator.FixGen(fixes)
+        sim2.initializeData(fit=None)
         
+        result_x = []
+        result_y = []
+        KLDiv_real_x = []
+        KLDiv_real_y = []
+
+        for i in range(len(sim.full_H1)-1):
+            KLDiv_base_x = []
+            KLDiv_base_y = []
+            tmp = []
+            tmp1 = []
+            prob_base_x = []
+            prob_base_y = []
+            prob_real_x = []
+            prob_real_y = []
+
+            ### Draw 1000 samples from multinomial dist
+            stat_base_x = np.random.multinomial(sim2.nosamples[i],np.sum(sim.full_H1[i],1),size=500)
+            stat_base_y = np.random.multinomial(sim2.nosamples[i],np.sum(sim.full_H1[i],0),size=500)
+            
+            # Compute probabilities of stat_base
+            for j in range(len(stat_base_x)):
+                tmp.append(multinomial(stat_base_x[j], np.sum(sim.full_H1[i],1)))
+                tmp1.append(multinomial(stat_base_y[j], np.sum(sim.full_H1[i],0)))
+            prob_base_x.append(tmp)
+            prob_base_y.append(tmp1)
+
+            
+            ### Compute KLDiv between 1000 samples and source
+            for j in range(len(stat_base_x)):
+                KLDiv_base_x.append(KLDiv(stat_base_x[j]/np.float(np.sum(stat_base_x[j])), np.sum(sim.full_H1[i],1)))
+                KLDiv_base_y.append(KLDiv(stat_base_y[j]/np.float(np.sum(stat_base_y[j])), np.sum(sim.full_H1[i],0)))
+                
+            ### Compute KLDiv between simulated and source    
+            KLDiv_real_x.append(KLDiv(np.sum(sim.full_H1[i],1), np.sum(sim2.full_H1[i],1)))
+            KLDiv_real_y.append(KLDiv(np.sum(sim.full_H1[i],0), np.sum(sim2.full_H1[i],0)))
+            
+            # Compute probabilities of real outcomes
+            prob_real_x.append(multinomial(np.sum(sim2.full_H1[i],1)*sim2.nosamples[i], np.sum(sim.full_H1[i],1)))
+            prob_real_y.append(multinomial(np.sum(sim2.full_H1[i],0)*sim2.nosamples[i], np.sum(sim.full_H1[i],0)))            
+            
+            ### Compare simulated against multinomially sampled    
+            result_x.append(np.array(KLDiv_real_x[-1]) > np.mean(KLDiv_base_x)+np.std(KLDiv_base_x))
+            result_y.append(np.array(KLDiv_real_y[-1]) > np.mean(KLDiv_base_y)+np.std(KLDiv_base_y))
+            pdb.set_trace()
         
+        KLDiv_real_x, KLDiv_real_y = np.array(KLDiv_real_x), np.array(KLDiv_real_y)
+            
+        pdb.set_trace()
+
+        if sum(result_x)<len(result_x):
+            print "Horizontal margin failure in layer(s) " + repr(np.where(result_x))
+            print "With a KLDiv of " + repr(KLDiv_real_x[result_x])
+           
+        if sum(result_y)<len(result_y):
+            print "Vertical margin failure in layer(s) " + repr(np.where(result_y))
+            print "With a KLDiv of " + repr(KLDiv_real_y[result_y])
+
+def parallel_probs(sim, A):
+    sim.initializeData(fit=None, full_H1=A)
+    fixes = sim.sample_many(num_samples = 2000)
+    sim2 = simulator.FixGen(fixes)
+    sim2.initializeData(fit=None)
     
+    stat_base = np.random.multinomial(sim2.nosamples[1],np.sum(sim.full_H1[1],1))
+    
+    
+    return (multinomial(stat_base,np.sum(sim.full_H1[1],1)), multinomial(np.sum(sim2.full_H1[1],1)*sim2.nosamples[1], np.sum(sim.full_H1[1],1)))
+    
+    
+def simprob():
+    mec = client.MultiEngineClient()
+    mec.get_ids()
+    mec.execute('import simulator')
+    mec.execute('from tool import multinomial')
+    mec.execute('import numpy as np')
+    fm = fixmat.FixmatFactory('fixmat_photos.mat')
+
+
+    H = np.ones((37,361))
+    H/=H.sum()
+    A = []
+    for i in range(36):
+        A.append(H)
+
+    sim = simulator.FixGen(fm)
+    sim.initializeData(fit=None, full_H1 = A)   
+    
+    runs = 500
+    siminst = [simulator.FixGen(fm) for x in range(runs)]
+    A = [A for x in range(runs)]
+    
+    result = mec.map(parallel_probs, siminst, A)
+
+    '''
+    fix_list = mec.map(parallel_probs, siminst, A)
+    sim2array = [simulator.FixGen(fixes) for fixes in fix_list]
+    [sim2.initializeData(fit=None) for sim2 in sim2array]
+    #pdb.set_trace()
+   
+    return [multinomial(np.sum(sim2.full_H1[1],1)*sim2.nosamples[1], np.sum(sim.full_H1[1],1)) for sim2 in sim2array]
+    '''
+    return result
+        
         
 if __name__ == '__main__':
     unittest.main()

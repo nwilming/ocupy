@@ -4,12 +4,21 @@
 from numpy import asarray
 import numpy as np
 from warnings import warn
+import cPickle
 
 have_image_library=True
 try:
     from scipy.misc import toimage, fromimage #@UnresolvedImport
 except ImportError:
     have_image_library=False
+
+	def isiterable(some_object):
+    try:
+        iter(some_object)
+    except TypeError:
+        return False
+    return True
+
 
 if have_image_library:
     def imresize(arr, newsize, interp='bicubic', mode=None):
@@ -265,6 +274,22 @@ def factorise_strings (string_list, boundary_char=None):
 
     return (new_list, cmn)
 
+class Memoize:
+    """
+    Memoize with mutable arguments
+    """
+    def __init__(self, function):
+        self.function = function
+        self.memory = {}
+
+    def __call__(self, *args, **kwargs):
+        hash_str = cPickle.dumps(args) + cPickle.dumps(kwargs)
+        if not hash_str in self.memory:
+            self.memory[hash_str] = self.function(*args, **kwargs)
+        return self.memory[hash_str]
+
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
+

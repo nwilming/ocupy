@@ -5,3 +5,4 @@ ocupy.egg-info
 *.pyc
 *~
 .*.swp
+*DS_STORE

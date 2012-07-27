@@ -6,7 +6,7 @@ import inspect
 import numpy as np
 
 from ocupy import fixmat
-from ocupy.fixmat import compute_fdm, NoFixations
+from ocupy.fixmat import compute_fdm
 from ocupy.utils import calc_resize_factor
 
 
@@ -120,7 +120,7 @@ def kldiv(p, q, distp = None, distq = None, scale_factor = 1):
             p = compute_fdm(distp, scale_factor = scale_factor)
         if q == None:
             q = compute_fdm(distq, scale_factor = scale_factor)
-    except NoFixations:
+    except RuntimeError:
         return np.NaN
 
     q += np.finfo(q.dtype).eps
