@@ -11,6 +11,7 @@ from scipy.ndimage.filters import gaussian_filter
 from utils import snip_string_middle, isiterable
 import h5py
 from numpy import ma
+
 class Datamat(object):
     """
     Represents grouped data.
@@ -355,7 +356,7 @@ class Datamat(object):
         True
         >>> 'interospective_awareness' in dm_emotiv.fieldnames()
         False
-        >>> dm_emotiv.copy_field(dm_intero, 'interospective_awareness', 'subject_id')
+        >>> dm_emotiv.annotate(dm_intero, 'interospective_awareness', 'subject_id')
         >>> 'interospective_awareness' in dm_emotiv.fieldnames()
         True
         >>> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
