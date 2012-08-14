@@ -1,16 +1,21 @@
 #!/usr/bin/env python
-"""This module implements the Datamat Structure for managing data structured in blocks (i.e. eye-tracking data.)"""
+"""
+This module implements the Datamat Structure for managing data structured in 
+blocks (i.e. eye-tracking data.)
+"""
 import warnings
-from os.path import join
-from warnings import warn
-from glob import glob
+#from os.path import join
+#from warnings import warn
+#from glob import glob
 
 import numpy as np
-from scipy.io import loadmat
-from scipy.ndimage.filters import gaussian_filter
-from utils import snip_string_middle, isiterable
-import h5py
 from numpy import ma
+
+#from scipy.io import loadmat
+#from scipy.ndimage.filters import gaussian_filter
+from utils import snip_string_middle, isiterable
+#from scipy.stats import nanmean,nanmedian
+import h5py
 
 class Datamat(object):
     """
@@ -38,13 +43,11 @@ class Datamat(object):
         This is handled by Datamat factories.
     """ 
     
-    def __init__(self, categories = None, datamat = None, index = None):
+    def __init__(self, datamat = None, index = None):
         """
         Creates a new Datamat from an existing one
 
         Parameters:
-            categories : optional, instance of stimuli.Categories,
-                allows direct access to image data via the Datamat
             datamat : instance of datamat.Datamat, optional
                 if given, the existing Datamat is copied and only those fixations
                 that are marked True in index are retained.
@@ -55,10 +58,13 @@ class Datamat(object):
                 that a datamat always holds arrays, never scalar values, as fields.
 
         TODO: thoroughly test that all indices work as expected (including slicing etc)
+        
+        NB: because of this usage of the constructor to filter also,
+        and because of the non-intuitive self object in Python, and because of
+        Python's multiple inheritance, sub-classing Datamat is a royal PITA.
         """
         
         self._fields = []
-        self._categories = categories
         self._parameters = {}
         self._num_fix = 0
         #warn('this needs to be thoroughly tested for indexes that are not boolean NumPy arrays!')
@@ -87,9 +93,9 @@ class Datamat(object):
         return 'Datamat(%i elements)' % (len(self))
 
     def __str__(self):
-        desc = "Datamat with %i datapoints and the following data fields:\n" % (
+        desc = "Datamat with %i elements and the following data fields:\n" % (
                                                                     len(self))
-        desc += "%s | %s | %s | %s \n" % ('Field Name'.rjust(20),
+        desc += "%s | %s | %s | %s\n" % ('Field Name'.rjust(20),
                                           'Length'.center(13), 
                                           'Type'.center(10), 
                                           'Values'.center(20))
@@ -98,22 +104,58 @@ class Datamat(object):
         tmp_fieldnames.sort()
         max_field_val_len = 40
         for field in tmp_fieldnames:
-            if not self.__dict__[field].dtype == np.object:
-                num_uniques = np.unique(self.__dict__[field])
-                if len(num_uniques) > 5:
-                    num_uniques = '%d unique'%(len(num_uniques))
-                elif len(str(num_uniques)) > max_field_val_len:
-                    per_val_len = (max_field_val_len // len(num_uniques))-1
-                    if isinstance(num_uniques[0], str) or isinstance(num_uniques[0], unicode):
-                        num_uniques = np.array([snip_string_middle(str(el),per_val_len, '..') for el in num_uniques])
-            else:
-                num_uniques = 'N/A'
-            
+            value_str = '?'
+            dat = self.__dict__[field]
+            if not dat.dtype == np.object:
+                unique_vals = np.unique(dat)
+                if len(unique_vals) > 5:
+                    value_str = '%d unique'%(len(unique_vals))
+                elif len(str(unique_vals)) > max_field_val_len:
+                    per_val_len = (max_field_val_len // len(unique_vals))-1
+                    if isinstance(unique_vals[0], str) or isinstance(unique_vals[0], unicode):
+                        value_str = str(np.array([snip_string_middle(str(el),per_val_len, '..') for el in unique_vals]))
+                    else:
+                        value_str = snip_string_middle(str(unique_vals), max_field_val_len, '..')
+                else:
+                    value_str = str(unique_vals)
+            else: #object array
+                if not isinstance(dat[0], np.ndarray):
+                    value_str = type(dat[0]).__name__
+                else:
+                    value_str = str(dat[0].dtype)+' arrays'
+                    
+#                    try:
+#                        minvals=[]
+#                        maxvals=[]
+#                        medvals=[]
+#                        menvals=[]
+#                        for el in dat:
+#                            if el is None:
+#                                continue
+#                            elm = ma.masked_invalid(el)
+#                            minvals.append(elm.min())
+#                            maxvals.append(elm.max())
+#                            medvals.append(ma.median(elm))
+#                            menvals.append(ma.mean(elm))
+#                            
+#                        minval = np.nanmax(minvals)
+#                        maxval = np.nanmax(maxvals)
+#                        medval = nanmedian(medvals)
+#                        menval = nanmean(menvals)
+#                        value_str = '%.2f<%.2f~%.2f<%.2f' % (minval,
+#                                                            medval,
+#                                                            menval,
+#                                                            maxval)
+#                    except Exception as ex:
+#                        print 'debug: %s: %s' % (field, ex)
+#                        raise ex
+#                        value_str = 'N/A'
+
             field_display_name = snip_string_middle(field, 20)
-            desc += "%s | %s | %s | %s \n" % (field_display_name.rjust(20), 
-                                    str(len(self.__dict__[field])).center(13),
-                                    str(self.__dict__[field].dtype).center(10),
-                                    str(num_uniques).center(20))
+            desc += "%s | %s | %s | %s\n" % (field_display_name.rjust(20), 
+                                    str(len(dat)).center(13),
+                                    str(dat.dtype).center(10),
+                                    str(value_str).center(20))
         desc += "---------------------+---------------+------------+----------------\n"
         desc += "%s | %s\n" % ('Parameter Name'.rjust(20), 'Value'.ljust(20))
         desc += "---------------------+---------------------------------------------\n"
@@ -122,7 +164,7 @@ class Datamat(object):
         max_param_val_len = 13 + 3 + 10 + 3 + 20
         for param in param_keys:
             param_display_name = snip_string_middle(param, 20)
-            desc += '%s | %s \n' % (param_display_name.rjust(20),
+            desc += '%s | %s\n' % (param_display_name.rjust(20),
                                     snip_string_middle(str(self.__dict__[param]), max_param_val_len))
         return desc
    
@@ -164,8 +206,11 @@ class Datamat(object):
                 passes the filter; else contains False
         Returns:
             datamat : Datamat Instance
+            
+            NB: rmuil: should be using type(self) so that subclasses can use this function
+            and don't get returned a bare Datamat. Tricky though.
         """
-        return Datamat(categories=self._categories, datamat=self, index=index)
+        return Datamat(datamat=self, index=index)
 
     def copy(self):
         """
@@ -238,44 +283,6 @@ class Datamat(object):
         """
         for value in np.unique(self.__dict__[field]):
             yield self.filter(self.__dict__[field] == value)
-
-    def by_cat(self): 
-        """
-        Iterates over categories and returns a filtered datamat. 
-        
-        If a categories object is attached, the images object for the given 
-        category is returned as well (else None is returned).
-        
-        Returns:
-            (datamat, categories) : A tuple that contains first the filtered
-                datamat (has only one category) and second the associated 
-                categories object (if it is available, None otherwise)
-        """
-        for value in np.unique(self.category):
-            cat_fm = self.filter(self.category == value) 
-            if self._categories:
-                yield (cat_fm, self._categories[value]) 
-            else: 
-                yield (cat_fm, None) 
-             
-    def by_filenumber(self): 
-        """
-        Iterates over categories and returns a filtered datamat. 
-        
-        If a categories object is attached, the images object for the given 
-        category is returned as well (else None is returned).
-        
-        Returns:
-            (datamat, categories) : A tuple that contains first the filtered
-                datamat (has only one category) and second the associated 
-                categories object (if it is available, None otherwise)
-        """
-        for value in np.unique(self.filenumber):
-            file_fm = self.filter(self.filenumber == value) 
-            if self._categories:
-                yield (file_fm, self._categories[self.category[0]][value]) 
-            else: 
-                yield (file_fm, None)        
     
     def add_field(self, name, data):
         """
@@ -498,7 +505,7 @@ class Datamat(object):
                 if minimal_subset:
                     self.rm_field(field)
                 else:
-		    warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
+                    warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
                     fm_new.add_field_like(field, self.field(field))
         # ... then those in the new that do not exist in self.
         orig_fields = fm_new._fields[:]
@@ -507,7 +514,7 @@ class Datamat(object):
                 if minimal_subset:
                     fm_new.rm_field(field)
                 else:
-	            warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
+                    warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
                     self.add_field_like(field, fm_new.field(field))
 
         # Concatenate fields
@@ -537,14 +544,14 @@ def load(path):
     f.close()
     return VectorFactory(fields, params)
 
-def VectorFactory(fields, parameters, categories = None):
-    fm = Datamat(categories = categories)
+def VectorFactory(fields, parameters):
+    fm = Datamat()
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
         fm.__dict__[field] = value 
     fm._parameters = parameters
     for (field, value) in parameters.iteritems(): 
-       fm.__dict__[field] = value
+        fm.__dict__[field] = value
     fm._num_fix = len(fm.__dict__[fields.keys()[0]])
     return fm
 
