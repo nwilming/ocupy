@@ -475,13 +475,7 @@ class Datamat(object):
 
         """
         # Check if parameters are equal. If not, promote them to fields.
-        for (nm, val) in self._parameters.items():
-            if fm_new._parameters.has_key(nm):
-                if (val != fm_new._parameters[nm]):
-                    self.parameter_to_field(nm)
-                    fm_new.parameter_to_field(nm)
-            else:
-                self.parameter_to_field(nm)
+        '''
         for (nm, val) in fm_new._parameters.items():
             if self._parameters.has_key(nm):
                 if (val != self._parameters[nm]):
@@ -489,6 +483,7 @@ class Datamat(object):
                     fm_new.parameter_to_field(nm)
             else:
                 fm_new.parameter_to_field(nm)
+        '''
         # Deal with mismatch in the fields
         # First those in self that do not exist in new...
         orig_fields = self._fields[:]
