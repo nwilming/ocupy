@@ -287,6 +287,103 @@ class Memoize:
             self.memory[hash_str] = self.function(*args, **kwargs)
         return self.memory[hash_str]
 
+#def pad_vector0(data,center, window = [-7, 7]):
+#	"""
+#	Takes a specific part a vector, namely the window around the center index.
+#	This works even if the window exceeds the extent of the input vector,
+#	by padding with the pad_element.
+#	
+#	NB: the interpretation of the window argument needs some explanation:
+#	the elements are interpreted as *inclusive* offsets from the center.
+#	When the second argument is less than the first, the result is odd...
+#	Niklas?
+#	 
+#	Returns a copy of the index.
+#	Author: nwilming@UoS.de
+#	"""
+#	wlen = abs(window[0]-window[1]-1)
+#	new_center = abs(window[0]-window[1]-1)/2
+#	num_pre = new_center - center
+#	d_start = 0
+#	if num_pre < 0:
+#		d_start = abs(num_pre)
+#		num_pre = 0
+#	out = [np.NaN]*num_pre + list(data[d_start:])
+#	if len(out) > wlen:
+#		return np.array(out[0:wlen])
+#	else:
+#		return np.array(out + [np.NaN]*(wlen-len(out)))
+
+def pad_vector(data, center, window, pad_element=np.NaN):
+    """
+    Takes a specific part a vector, namely the window around the center index.
+    This works even if the window exceeds the extent of the input vector,
+    by padding with the pad_element.
+    
+    The window is interpreted as indices relative to the center, so that the
+    new vector will go from (center-window[0]) to (center-window[1]).
+    
+    The size of the output will be window[1]-window[0]
+    
+    Returns a copy of the index.
+    Output will be an array if input is array, otherwise a list.
+    Author: rmuil@UoS.de
+    
+    Be aware that the window elements are indices, not lengths:
+    >>> pad_vector(range(10), center=5, window=[-2, 3])
+    [3, 4, 5, 6, 7]
+    >>> len(_)
+    5
+    
+    Exceeding input size will cause padding:
+    >>> pad_vector(range(10), center=5, window=[-7, 7])
+    [nan, nan, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, nan, nan]
+    >>> len(_)
+    14
+    
+    If input is an array, output will also be:
+    >>> pad_vector(np.arange(10), center=5, window=[-1, 2])
+    array([4, 5, 6])
+    
+    The start index can also be after the end of the input:
+    >>> pad_vector(range(10), center=5, window=[5, 7])
+    [nan, nan]
+    
+    Likewise, the end index can be before the start of the input:
+    >>> pad_vector(range(10), center=5, window=[-15, -10])
+    [nan, nan, nan, nan, nan]
+
+    Ending before start gives empty vector:
+    >>> pad_vector(range(10), center=5, window=[5, 0])
+    []
+
+    
+    """
+    sidx = center + window[0]
+    eidx = center + window[1]
+    num_pre = 0
+    num_post = 0
+    #print num_pre,sidx,eidx,num_post
+    if sidx < 0:
+        num_pre = -sidx
+        sidx = 0
+        if eidx < sidx:
+            num_pre -= (sidx-eidx)
+    if eidx < 0:
+        eidx = 0
+    elif eidx > len(data):
+        num_post = eidx - len(data)
+        eidx = len(data)
+        if sidx > eidx:
+            num_post -= (sidx-eidx)
+    #print num_pre,sidx,eidx,num_post
+    out = [pad_element]*num_pre + list(data[sidx:eidx]) + [pad_element]*num_post
+    return_array = isinstance(data, np.ndarray)
+    
+    if return_array:
+        out = np.array(out) 
+    
+    return out
 
 if __name__ == '__main__':
     import doctest
