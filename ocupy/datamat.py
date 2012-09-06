@@ -6,16 +6,13 @@ blocks (i.e. eye-tracking data.)
 import warnings
 #from os.path import join
 #from warnings import warn
-#from glob import glob
-
 import numpy as np
 from numpy import ma
 
-#from scipy.io import loadmat
-#from scipy.ndimage.filters import gaussian_filter
 from utils import snip_string_middle, isiterable
 #from scipy.stats import nanmean,nanmedian
 import h5py
+import ipdb #@UnusedImport
 
 class Datamat(object):
     """
@@ -67,13 +64,7 @@ class Datamat(object):
         self._fields = []
         self._parameters = {}
         self._num_fix = 0
-        #warn('this needs to be thoroughly tested for indexes that are not boolean NumPy arrays!')
         if datamat is not None and index is not None:
-            #index = index.reshape(-1,).astype(bool)
-            #assert index.shape[0] == datamat._num_fix, ("Index vector for " +
-            #    "filtering has to have the same length as the fields of the Datamat")
-            #TODO: check this for slicing operations (fields will be views
-            #rather than separate objects.
             if not isiterable(index):
                 index = [index]
             self._fields = datamat._fields[:]
@@ -322,10 +313,10 @@ class Datamat(object):
         Adds a new field (data_field) to the Datamat with data from the
         corresponding field of another Datamat (src_dm).
         
-				This is accomplished through the use of a key_field, which is
+        This is accomplished through the use of a key_field, which is
         used to determine how the data is copied.
         
-				This operation corresponds loosely to an SQL join operation.
+        This operation corresponds loosely to an SQL join operation.
 
         The two Datamats are essentially aligned by the unique values
         of key_field so that each block element of the new field of the target
@@ -343,9 +334,9 @@ class Datamat(object):
         The new field in the target Datamat will be a masked array to handle
         non-existent data.
        	
-				TODO: Make example more generic, remove interoceptive reference
-				TODO: Make standalone test
         Examples:
+        	TODO: Make example more generic, remove interoceptive reference
+			TODO: Make stand-alone test
         
         >>> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
         >>> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
@@ -387,7 +378,8 @@ class Datamat(object):
         # Datamat. NaNs are fine as indication of this for floats, but if the
         # field happens to hold booleans or integers or something else, NaN
         # does not work.
-        new_shape = [len(self)] + list(data_element.shape)
+        aa = 1 if take_first else 0
+        new_shape = [len(self)] + list(data_element.shape)[aa:]
         new_data = ma.empty(new_shape, data_element.dtype)
         new_data.mask=True
         if np.issubdtype(new_data.dtype, np.float):
