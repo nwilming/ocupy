@@ -185,11 +185,11 @@ class Datamat(object):
         the array says False. The logical array can conveniently be created
         with numpy::
         
-            >>> print np.unique(fm.category)
-            np.array([2,9])
-            >>> fm_filtered = fm[ fm.category == 9 ]
-            >>> print np.unique(fm_filtered)
-            np.array([9])
+	        >> print np.unique(fm.category)
+	        np.array([2,9])
+	        >> fm_filtered = fm[ fm.category == 9 ]
+	        >> print np.unique(fm_filtered)
+	        np.array([9])
     
         Parameters:
             index : array
@@ -338,26 +338,26 @@ class Datamat(object):
         	TODO: Make example more generic, remove interoceptive reference
 			TODO: Make stand-alone test
         
-        >>> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
-        >>> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
-        >>> length(dm_intero)
+        >> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
+        >> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
+        >> length(dm_intero)
         4
-        >>> unique(dm_intero.subject_id)
+        >> unique(dm_intero.subject_id)
         ['p05', 'p06']
-        >>> length(dm_emotiv)
+        >> length(dm_emotiv)
         3
-        >>> unique(dm_emotiv.subject_id)
+        >> unique(dm_emotiv.subject_id)
         ['p04', 'p05', 'p06']
-        >>> 'interospective_awareness' in dm_intero.fieldnames()
+        >> 'interospective_awareness' in dm_intero.fieldnames()
         True
-        >>> unique(dm_intero.interospective_awareness) == [0.5555, 0.6666]
+        >> unique(dm_intero.interospective_awareness) == [0.5555, 0.6666]
         True
-        >>> 'interospective_awareness' in dm_emotiv.fieldnames()
+        >> 'interospective_awareness' in dm_emotiv.fieldnames()
         False
-        >>> dm_emotiv.annotate(dm_intero, 'interospective_awareness', 'subject_id')
-        >>> 'interospective_awareness' in dm_emotiv.fieldnames()
+        >> dm_emotiv.annotate(dm_intero, 'interospective_awareness', 'subject_id')
+        >> 'interospective_awareness' in dm_emotiv.fieldnames()
         True
-        >>> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
+        >> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
         False
         """
         if key_field not in self._fields or key_field not in src_dm._fields:
@@ -536,7 +536,34 @@ def load(path):
     f.close()
     return VectorFactory(fields, params)
 
-def VectorFactory(fields, parameters):
+def VectorFactory(fields, parameters={}):
+    """
+    Creates a new DataMat based on 2 dictionaries: one for the fields and one
+    for the parameters.
+    
+    >>> new_dm = VectorFactory({'field1':ma.array([1,2,3,4]),\
+    		'field2':ma.array(['a','b','c','d'])},{'param1':'some parameter'})
+    >>> new_dm
+    Datamat(4 elements)
+    >>> print new_dm # doctest:+ELLIPSIS
+    Datamat with 4 elements and the following data fields:
+              Field Name |     Length    |    Type    |        Values       
+    ---------------------+---------------+------------+----------------
+                  field1 |       4       |   int64    |      [1 2 3 4]      
+                  field2 |       4       |    |S1     |  ['a' 'b' 'c' 'd']  
+    ---------------------+---------------+------------+----------------
+          Parameter Name | Value               
+    ---------------------+---------------------------------------------
+                  param1 | some parameter
+    ...
+    
+    >>> new_dm = VectorFactory({'field1':ma.array([1,2,3,4])})
+    >>> new_dm
+    Datamat(4 elements)
+    
+    TODO: convert fields into arrays.
+    
+    """ 
     fm = Datamat()
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
