@@ -97,7 +97,7 @@ class Datamat(object):
         tmp_fieldnames.sort()
         max_field_val_len = 40
         for field in tmp_fieldnames:
-            if not self.__dict__[field].dtype == np.object:
+            if not self.__dict__[field].dtype == np.object and len(self) < 100000:
                 num_uniques = np.unique(self.__dict__[field])
                 if len(num_uniques) > 5:
                     num_uniques = '%d unique'%(len(num_uniques))
@@ -503,7 +503,10 @@ class Datamat(object):
                 else:
 	            warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
                     self.add_field_like(field, fm_new.field(field))
-
+        
+        if 'SUBJECTINDEX' in self._fields[:]:
+            if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
+                fm_new.SUBJECTINDEX[:] = self.SUBJECTINDEX.max()+1
         # Concatenate fields
         for field in self._fields:
             self.__dict__[field] = ma.hstack((self.__dict__[field], 
