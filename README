@@ -1,13 +1,13 @@
 Ocupy - Oculography Analysis Tools
 ----------------------------------
 
-Ocupy provides functionality for analysis of blocked data:
+Ocupy provides functionality for analysis of grouped data:
 
-    * DataMat objects for reading of and filtering by block meta-data and data
-    * Corresponding objects for stimulus data, aligned to DataMat objects
+    * Datamat objects for reading of and filtering by group meta-data and data
+    * Corresponding objects for stimulus data, aligned to Datamat objects
     * Measures for prediction quality for eye-tracking data: AUC, NSS, KL, EMD.
     * Lower and upper bound calculation for prediction quality of attention models.
-    * RPC Client/Server for parallel task execution on a grid
+    * RPC Client/Server for parallel task execution on a grid [deprecated]
     * Evaluation (with cross-validation) of attention models 
 
 
@@ -20,7 +20,7 @@ To install ocupy into your Python environment, type:
     python setup.py test
     python setup.py install
 
-The core requirements for ocupy, numpy and scipy, are automatically
+The core requirements for ocupy, numpy, scipy and h5py, are automatically
 installed if not found on your Python path.
 
 If you want to use the parallel module you'll need to install Twisted manually.
@@ -44,7 +44,7 @@ path, if you didn't install it add this directory to the python path:
 Copyright & License
 -------------------
 
-Copyright (C) 2010, 2011 WhiteMatter Labs GmbH -- http://whitematter.de
+Copyright (C) 2010, 2011, 2012 WhiteMatter Labs GmbH -- http://whitematter.de
 
 Licensed under GPLv2 or later, see file LICENSE in this source tree
 
