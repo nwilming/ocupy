@@ -1,15 +1,23 @@
 #!/usr/bin/env python
 """A helper module that collects some useful auxillary functions."""
 
-from numpy import asarray
+from numpy import asarray, ma
 import numpy as np
-from warnings import warn
+import cPickle
 
 have_image_library=True
 try:
     from scipy.misc import toimage, fromimage #@UnresolvedImport
 except ImportError:
     have_image_library=False
+
+def isiterable(some_object):
+    try:
+        iter(some_object)
+    except TypeError:
+        return False
+    return True
+
 
 if have_image_library:
     def imresize(arr, newsize, interp='bicubic', mode=None):
@@ -165,17 +173,17 @@ def snip_string(string, max_len=20, snip_string='...', snip_point=0.5):
     characters with the snip_string.
     The snip is done at snip_point, which is a fraction between 0 and 1,
     indicating relatively where along the string to snip. snip_point of
-    0.5 would be the middle.
+    0.5 is the middle.
     >>> snip_string('this is long', 8)
-    'this ...'
-    >>> snip_string('this is long', 8, snip_point=0.5)
     'th...ong'
+    >>> snip_string('this is long', 8, snip_point=1)
+    'this ...'
     >>> snip_string('this is long', 12)
     'this is long'
     >>> snip_string('this is long', 8, '~')
-    'this is~'
-    >>> snip_string('this is long', 8, '~', 0.5)
     'thi~long'
+    >>> snip_string('this is long', 8, '~', 1)
+    'this is~'
     
     """
     if len(string) <= max_len:
@@ -265,6 +273,156 @@ def factorise_strings (string_list, boundary_char=None):
 
     return (new_list, cmn)
 
+class Memoize:
+    """
+    Memoize with mutable arguments
+    """
+    def __init__(self, function):
+        self.function = function
+        self.memory = {}
+
+    def __call__(self, *args, **kwargs):
+        hash_str = cPickle.dumps(args) + cPickle.dumps(kwargs)
+        if not hash_str in self.memory:
+            self.memory[hash_str] = self.function(*args, **kwargs)
+        return self.memory[hash_str]
+
+#def pad_vector0(data,center, window = [-7, 7]):
+#	"""
+#	Takes a specific part a vector, namely the window around the center index.
+#	This works even if the window exceeds the extent of the input vector,
+#	by padding with the pad_element.
+#	
+#	NB: the interpretation of the window argument needs some explanation:
+#	the elements are interpreted as *inclusive* offsets from the center.
+#	When the second argument is less than the first, the result is odd...
+#	Niklas?
+#	 
+#	Returns a copy of the index.
+#	Author: nwilming@UoS.de
+#	"""
+#	wlen = abs(window[0]-window[1]-1)
+#	new_center = abs(window[0]-window[1]-1)/2
+#	num_pre = new_center - center
+#	d_start = 0
+#	if num_pre < 0:
+#		d_start = abs(num_pre)
+#		num_pre = 0
+#	out = [np.NaN]*num_pre + list(data[d_start:])
+#	if len(out) > wlen:
+#		return np.array(out[0:wlen])
+#	else:
+#		return np.array(out + [np.NaN]*(wlen-len(out)))
+
+def pad_vector(data, center, window, pad_element=np.NaN):
+    """
+    Takes a specific part a vector, namely the window around the center index.
+    This works even if the window exceeds the extent of the input vector,
+    by padding with the pad_element.
+    
+    'center' is the index into data around which to build the window.
+    
+    The window is interpreted also as indices and are relative to the center,
+    so that the
+    new vector will go from (center+window[0]) to (center+window[1]).
+    NB: This is a little non-intuitive because of the non-inclusive indexing in
+    Python, which will mean that the element at center+window[1] will *not*
+    be included in the output. This makes sense if the window is seen as indices:
+	    >>> [0,1,2,3][0:3]
+	    [0, 1, 2]
+    
+    The size of the output will be window[1]-window[0]
+    
+    Returns a copy of the index.
+    Output will be a masked array if input is masked array, an ndarray if
+     the input is an ndarray, otherwise a list.
+    
+    Author: rmuil@UoS.de
+    
+    Examples:
+    
+    Be aware that the window elements are indices, not lengths:
+	    >>> pad_vector(range(10), center=5, window=[-2, 3])
+	    [3.0, 4.0, 5.0, 6.0, 7.0]
+	    >>> len(_)
+	    5
+    
+    The pad_element determines the output data type:
+	    >>> pad_vector(range(10), center=5, window=[-2, 3],pad_element=-1)
+	    [3, 4, 5, 6, 7]
+    
+    Exceeding input size will cause padding:
+	    >>> pad_vector(range(10), center=5, window=[-7, 7])
+	    [nan, nan, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, nan, nan]
+	    >>> len(_)
+	    14
+    
+    Output element type is determined by pad_element type:
+	    >>> pad_vector(range(10), center=5, window=[-7, 7], pad_element=-1)
+	    [-1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1, -1]
+    
+    If input is an array, output will also be:
+	    >>> pad_vector(np.arange(10), center=5, window=[-1, 2])
+	    array([ 4.,  5.,  6.])
+    
+    If input is a masked array, output will also be:
+	    >>> pad_vector(ma.arange(10), center=5, window=[-1, 7]) # doctest:+ELLIPSIS
+	    masked_array(data = [4.0 5.0 6.0 7.0 8.0 9.0 -- --],
+	                 mask = [False False False False False False  True  True],
+	           fill_value = nan)
+	    ...
+	    >>> _.filled()
+	    array([  4.,   5.,   6.,   7.,   8.,   9.,  nan,  nan])
+
+    The start index can also be after the end of the input:
+	    >>> pad_vector(range(10), center=5, window=[5, 7])
+	    [nan, nan]
+    
+    Likewise, the end index can be before the start of the input:
+	    >>> pad_vector(range(10), center=5, window=[-15, -10])
+	    [nan, nan, nan, nan, nan]
+
+    Ending before start gives empty vector:
+	    >>> pad_vector(range(10), center=5, window=[5, 0])
+	    []
+
+    
+    """
+    sidx = center + window[0]
+    eidx = center + window[1]
+    num_pre = 0
+    num_post = 0
+    
+    dtype=type(pad_element)
+    
+    out_size = max(0,window[1]-window[0])
+    out = ma.masked_all(out_size,dtype)
+    out.set_fill_value(pad_element)
+    #print num_pre,sidx,eidx,num_post
+    if sidx < 0:
+        num_pre = -sidx
+        sidx = 0
+        if eidx < sidx:
+            num_pre -= (sidx-eidx)
+    if eidx < 0:
+        eidx = 0
+    elif eidx > len(data):
+        num_post = eidx - len(data)
+        eidx = len(data)
+        if sidx > eidx:
+            num_post -= (sidx-eidx)
+    #print num_pre,sidx,eidx,num_post
+    out[num_pre:out_size-num_post] = data[sidx:eidx]
+    #out = [pad_element]*num_pre + list(data[sidx:eidx]) + [pad_element]*num_post
+    
+    if not isinstance(data, np.ndarray):
+        out = list(out.filled())
+    elif not isinstance(data, ma.MaskedArray):
+        out = out.filled()
+    
+    return out
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
+

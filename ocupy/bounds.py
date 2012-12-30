@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import nanmean
 
 from ocupy import measures
-from ocupy.fixmat import compute_fdm, NoFixations
+from ocupy.fixmat import compute_fdm
 from ocupy.utils import ismember
 
 
@@ -63,7 +63,7 @@ def intersubject_scores(fm, category, predicting_filenumbers,
         (fm.category == category)]
     try:
         predicting_fdm = compute_fdm(predicting_fm, scale_factor = scale_factor)
-    except NoFixations:
+    except RuntimeError:
         predicting_fdm = None
 
     if controls == True:
@@ -164,7 +164,7 @@ def upper_bound(fm, nr_subs = None, scale_factor = 1):
                 try:
                     predicting_fdm = compute_fdm(predicting_fm,
                         scale_factor = scale_factor)
-                except NoFixations:
+                except RuntimeError:
                     predicting_fdm = None
                 image_scores.append(measures.prediction_scores(
                                         predicting_fdm, predicted_fm))
@@ -234,7 +234,7 @@ def lower_bound(fm, nr_subs = None, nr_imgs = None, scale_factor = 1):
                 try:
                     predicting_fdm = compute_fdm(predicting_fm,
                         scale_factor = scale_factor)
-                except NoFixations:
+                except RuntimeError:
                     predicting_fdm = None
                 image_scores.append(measures.prediction_scores(predicting_fdm,
                      predicted_fm))

@@ -77,15 +77,7 @@ class TestFixmat(unittest.TestCase):
         fm_add = fixmat.TestFixmatFactory(categories = [7], filenumbers = [10], subjectindices = [100],
                                     params = {'pixels_per_degree':10,'image_size':[100,500]})
         fm.join(fm_add)
-        fm_add2 = fixmat.TestFixmatFactory(categories = [7], filenumbers = [10], subjectindices = [100, 101],
-                                    params = {'pixels_per_degree':10,'image_size':[100,500]})
-        self.assertRaises(RuntimeError, lambda: fm.join(fm_add2))
-        fm_add = fixmat.TestFixmatFactory(categories = [7], filenumbers = [10], subjectindices = [100, 101],
-                                    params = {'pixels_per_degree':10,'image_size':[101,500]})
-        self.assertRaises(RuntimeError, lambda: fm.join(fm_add2))
 
-        fm_cmp = fm[ (fm.SUBJECTINDEX == 100) & (fm.category == 7) ]
-        self.compare_fixmats(fm_add, fm_cmp)
     
 
     def compare_fixmats(self, a, b):
@@ -213,6 +205,19 @@ class TestFixmat(unittest.TestCase):
             l2 = fm.__dict__[field]
             self.assertEquals(l1.size, l2.size)
             self.assertTrue((l1 == l2).all())
+
+    def test_copying(self):
+        fm = fixmat.TestFixmatFactory(categories = [7], 
+                filenumbers = [10], 
+                subjectindices = [100],
+                params = {'pixels_per_degree':10,'image_size':[100,500]})
+        fm.x[0] = 18728001
+        fm_copied = fm.copy()
+        fm_copied.pixels_per_degree = 100
+        self.assertFalse(fm.pixels_per_degree == fm_copied.pixels_per_degree)
+        fm_copied.x[0] = 1
+        self.assertFalse(fm.x[0] == fm_copied.x[0])
+
                
 if __name__ == '__main__':
     unittest.main()
