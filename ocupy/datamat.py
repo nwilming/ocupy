@@ -563,7 +563,35 @@ class AccumulatorFactory(object):
     
     def get_dm(self, params = {}):
         return VectorFactory(self.d, params)
-            
+
+class DatamatAccumulator(object):
+    def __init__(self):
+        self.l = []
+
+    def update(self, dm):
+        self.l.append(dm)
+
+    def get_dm(self):
+        # More efficient join
+        length=0
+        names = set(self.l[0].fieldnames())
+        for d in self.l:
+            length += len(d)
+            names.intersection(d.fieldnames())
+        dm_all = self.l[0].copy()
+        dm_all._num_fix = length
+        for f in names:
+            dm_all.rm_field(f)
+            dm_all.add_field(f, np.ones((length,)))
+            offset = 0
+            for d in self.l:
+                dm_all.field(f)[offset:offset+len(d)] = d.field(f)
+                offset = offset+len(d)
+        return dm_all
+                
+
+
+
 if __name__ == "__main__":
 
     import doctest
