@@ -146,8 +146,6 @@ class Image(object):
     def __getitem__(self, key):
         if not key in self._features:
             raise IndexError('The feature was not specified beforehand')
-        if not self.loader.test_for_feature(self.category, self.image, key):
-            raise IOError('Cannot load Feature %s' % (key, ))
         feature = self.loader.get_feature(self.category, self.image, key)
         return feature
     
