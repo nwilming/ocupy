@@ -121,7 +121,7 @@ class Image(object):
      
     def __iter__(self):
         for i in self._features:
-            yield self[i]
+            yield i,self[i]
 
     def features(self):
         """
