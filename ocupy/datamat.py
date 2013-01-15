@@ -1,13 +1,7 @@
 #!/usr/bin/env python
 """This module implements the Datamat Structure for managing data structured in blocks (i.e. eye-tracking data.)"""
 import warnings
-from os.path import join
-from warnings import warn
-from glob import glob
-
 import numpy as np
-from scipy.io import loadmat
-from scipy.ndimage.filters import gaussian_filter
 from utils import snip_string_middle, isiterable
 import h5py
 from numpy import ma
@@ -538,13 +532,38 @@ def VectorFactory(fields, parameters, categories = None):
     fm = Datamat(categories = categories)
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
-        fm.__dict__[field] = value 
+        fm.__dict__[field] = np.asarray(value)
     fm._parameters = parameters
     for (field, value) in parameters.iteritems(): 
        fm.__dict__[field] = value
     fm._num_fix = len(fm.__dict__[fields.keys()[0]])
     return fm
 
+class AccumulatorFactory(object):
+    
+    def __init__(self):
+        self.d = {}
+
+    def update(self, a):
+        if len(self.d.keys()) == 0:
+            self.d = dict((k,[v]) for k,v in a.iteritems())
+        else:
+            # For all fields in a that are also in dict
+            all_keys = set(a.keys() + self.d.keys())
+            for key in all_keys:
+                if key in a.keys():
+                    value = a[key]
+                if not key in self.d.keys():
+                    # key is not yet in d. add it
+                    self.d[key] = [np.nan]*len(self.d[self.d.keys()[0]])
+                if not key in a.keys():
+                    # key is not in new data. value should be nan
+                    value = np.nan
+                self.d[key].extend([value])                
+    
+    def get_dm(self, params = {}):
+        return VectorFactory(self.d, params)
+            
 if __name__ == "__main__":
 
     import doctest
