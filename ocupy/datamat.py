@@ -216,6 +216,13 @@ class Datamat(object):
             i.e. values that are valid for the entire datamat.
         """
         return self._parameters
+
+    def set_param(self, key, value):
+        """
+        Set the value of a parameter.
+        """
+        self.__dict__[key] = value
+        self._parameters[key] = value
                             
     def by_field(self, field):
         """
