@@ -278,7 +278,7 @@ def DirectoryFixmatFactory(directory, categories = None, glob_str = '*.mat'):
     return f_all
 
 
-def FixmatFactory(fixmatfile, categories = None):
+def FixmatFactory(fixmatfile, categories = None, var_name = 'fixmat'):
     """
     Loads a single fixmat (fixmatfile).
     
@@ -288,7 +288,7 @@ def FixmatFactory(fixmatfile, categories = None):
         categories : instance of stimuli.Categories, optional
             Links data in categories to data in fixmat.
     """
-    data = loadmat(fixmatfile, struct_as_record = False)['fixmat'][0][0]
+    data = loadmat(fixmatfile, struct_as_record = False)[var_name][0][0]
     num_fix = data.x.size
     
     # Get a list with fieldnames and a list with parameters

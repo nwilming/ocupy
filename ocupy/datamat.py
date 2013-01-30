@@ -597,6 +597,9 @@ class DatamatAccumulator(object):
         return dm_all
                 
 
+def DatamatFromRecordArray(arr):
+    d = dict((k, arr[k][0][0].flatten()) for k in arr.dtype.fields)
+    return VectorFactory(d,{})
 
 
 if __name__ == "__main__":
