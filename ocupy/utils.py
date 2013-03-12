@@ -320,6 +320,8 @@ def pad_vector(data, center, window, pad_element=np.NaN):
     This works even if the window exceeds the extent of the input vector,
     by padding with the pad_element.
     
+    NB: This is an important function. It is used for much analysis.
+    
     'center' is the index into data around which to build the window.
     
     The window is interpreted also as indices and are relative to the center,
@@ -333,7 +335,7 @@ def pad_vector(data, center, window, pad_element=np.NaN):
     
     The size of the output will be window[1]-window[0]
     
-    Returns a copy of the index.
+    Returns a copy of the input.
     Output will be a masked array if input is masked array, an ndarray if
      the input is an ndarray, otherwise a list.
     
@@ -414,15 +416,14 @@ def pad_vector(data, center, window, pad_element=np.NaN):
     #print num_pre,sidx,eidx,num_post
     out[num_pre:out_size-num_post] = data[sidx:eidx]
     #out = [pad_element]*num_pre + list(data[sidx:eidx]) + [pad_element]*num_post
-    
+
     if not isinstance(data, np.ndarray):
         out = list(out.filled())
     elif not isinstance(data, ma.MaskedArray):
         out = out.filled()
-    
+
     return out
 
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
-
