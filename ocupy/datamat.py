@@ -568,7 +568,9 @@ class AccumulatorFactory(object):
                     value = np.nan
                 self.d[key].extend([value])                
     
-    def get_dm(self, params = {}):
+    def get_dm(self, params = None):
+        if params is None:
+            params = {}
         return VectorFactory(self.d, params)
 
 class DatamatAccumulator(object):
@@ -576,7 +578,7 @@ class DatamatAccumulator(object):
         self.l = []
 
     def update(self, dm):
-        self.l.append(dm)
+        self.l.append(dm.copy())
 
     def get_dm(self):
         # More efficient join
@@ -584,7 +586,7 @@ class DatamatAccumulator(object):
         names = set(self.l[0].fieldnames())
         for d in self.l:
             length += len(d)
-            names.intersection(d.fieldnames())
+            names = names.intersection(d.fieldnames())
         dm_all = self.l[0].copy()
         dm_all._num_fix = length
         for f in names:
@@ -592,7 +594,8 @@ class DatamatAccumulator(object):
             dm_all.add_field(f, np.ones((length,)))
             offset = 0
             for d in self.l:
-                dm_all.field(f)[offset:offset+len(d)] = d.field(f)
+                val = d.field(f)
+                dm_all.field(f)[offset:offset+len(d)] = val
                 offset = offset+len(d)
         return dm_all
                 
