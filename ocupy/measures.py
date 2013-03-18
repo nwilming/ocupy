@@ -280,6 +280,8 @@ def fast_roc(actuals, controls):
         controls : list
             A list of numeric values for negative observations.
     """
+    assert(type(actuals) is np.ndarray)
+    assert(type(controls) is np.ndarray)
 
     actuals = np.ravel(actuals)
     controls = np.ravel(controls)
