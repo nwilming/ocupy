@@ -20,7 +20,6 @@ def get_velocity(samplemat, Hz):
     distance = np.hstack(([distance[0]],distance))
     win = np.concatenate([1*np.ones(velocity_window_size),0*np.ones(velocity_window_size)])/float(velocity_window_size)
     velocity = np.convolve(distance/(1.0/Hz), win, mode='same')
-    #velocity = gaussian_filter(distance/(1.0/Hz), velocity_window_size, mode='constant')
     win = np.concatenate([1*np.ones(acc_window_size),0*np.ones(acc_window_size)])/float(acc_window_size)
     acceleration = np.convolve(np.diff(velocity)/(1.0/Hz), win, mode='same')
     #acceleration = gaussian_filter(diff(velocity)/(1.0/Hz), acc_window_size,mode='constant')
