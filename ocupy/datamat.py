@@ -200,6 +200,13 @@ class Datamat(object):
         for param in self.parameters():
             fm_group.attrs[param]=self.__dict__[param]
         f.close()
+    
+    def tohdf5(self, h5obj, name):
+        fm_group = h5obj.create_group(name)
+        for field in self.fieldnames():
+            fm_group.create_dataset(field, data = self.__dict__[field])
+        for param in self.parameters():
+            fm_group.attrs[param]=self.__dict__[param]
 
                 
     def fieldnames(self):
@@ -525,16 +532,19 @@ def load(path):
             Absolute path of the file to load from.
     """
     f = h5py.File(path,'r')
-    fm_group = f['Datamat']
-    fields = {}
-    params = {}
-    for field, value in fm_group.iteritems():
-        fields[field] = ma.array(value)
-    for param, value in fm_group.attrs.iteritems():
-        params[param] = value
+    dm = fromhdf5(f['Datamat'])
     f.close()
-    return VectorFactory(fields, params)
+    return dm
 
+def fromhdf5(fm_group):
+    dm = {}
+    params = {}
+    for key, value in fm_group.iteritems():
+        dm[key] = value
+    for key, value in fm_group.attrs.iteritems():
+        params[key] = value
+    return VectorFactory(dm, params)
+       
 def VectorFactory(fields, parameters, categories = None):
     fm = Datamat(categories = categories)
     fm._fields = fields.keys()

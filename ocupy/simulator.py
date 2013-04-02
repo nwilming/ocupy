@@ -80,14 +80,15 @@ class FixGen(AbstractSim):
             fm: ocupy.fixmat
                 The fixation data to replicate in fixmat format.
         """
-        if type(fm)==ocupy.fixmat.FixMat:
+        if type(fm)==ocupy.fixmat.FixMat or type(fm)==ocupy.datamat.Datamat:
             self.fm = fm
         else:
             raise TypeError("Not a valid argument, insert fixmat")
 
         self.nosamples = []
         
-    def initializeData(self, fit = None, full_H1=None, max_length = 40, in_deg = True):
+    def initializeData(self, fit = None, full_H1=None, max_length = 40,
+            in_deg = True):
         """
         Prepares the data to be replicated. Calculates the second-order length 
         and angle dependencies between saccades and stores them in a fitted 

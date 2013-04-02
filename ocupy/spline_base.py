@@ -193,7 +193,7 @@ def spline_base1d(length, nr_knots = 20, spline_order = 5, marginal = None):
     Bsplines    = spcol(x_eval,knots,spline_order)
     return Bsplines, knots
 
-#@Memoize
+@Memoize
 def spline_base2d(width, height, nr_knots_x = 20.0, nr_knots_y = 20.0, 
         spline_order = 5, marginal_x = None, marginal_y = None):
     """Computes a set of 2D spline basis functions. 
