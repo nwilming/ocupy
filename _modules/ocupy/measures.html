@@ -1,0 +1,476 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>ocupy.measures &mdash; ocupy v0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="ocupy v0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ocupy v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for ocupy.measures</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/env python</span>
+<span class="sd">&quot;&quot;&quot;This module implements different model evaluation measures.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">inspect</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="kn">from</span> <span class="nn">ocupy.fixmat</span> <span class="kn">import</span> <span class="n">compute_fdm</span><span class="p">,</span> <span class="n">NoFixations</span>
+<span class="kn">from</span> <span class="nn">ocupy.utils</span> <span class="kn">import</span> <span class="n">calc_resize_factor</span>
+
+
+<span class="c"># List of measures, initialized below</span>
+<span class="n">scores</span> <span class="o">=</span> <span class="p">[]</span>
+
+<div class="viewcode-block" id="set_scores"><a class="viewcode-back" href="../../measures.html#ocupy.measures.set_scores">[docs]</a><span class="k">def</span> <span class="nf">set_scores</span><span class="p">(</span><span class="n">score_list</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Changes list of measures that are used by prediction_scores.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">scores</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="n">score_list</span>
+        </div>
+<div class="viewcode-block" id="prediction_scores"><a class="viewcode-back" href="../../measures.html#ocupy.measures.prediction_scores">[docs]</a><span class="k">def</span> <span class="nf">prediction_scores</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Evaluates a prediction against fixations in a fixmat with different measures.</span>
+<span class="sd">    </span>
+<span class="sd">    The default measures which are used are AUC, NSS and KL-divergence. This </span>
+<span class="sd">    can be changed by setting the list of measures with set_scores.  </span>
+<span class="sd">    As different measures need potentially different parameters, the kw</span>
+<span class="sd">    dictionary can be used to pass arguments to measures. Every named </span>
+<span class="sd">    argument (except fm and prediction) of a measure that is included in </span>
+<span class="sd">    kw.keys() will be filled with the value stored in kw.</span>
+<span class="sd">    Example:</span>
+<span class="sd">    </span>
+<span class="sd">    &gt;&gt;&gt; prediction_scores(P, FM, ctr_loc = (y,x))</span>
+<span class="sd">    </span>
+<span class="sd">    In this case the AUC will be computed with control points (y,x), because</span>
+<span class="sd">    the measure &#39;roc_model&#39; has &#39;ctr_loc&#39; as named argument.</span>
+<span class="sd">    </span>
+<span class="sd">    Input:</span>
+<span class="sd">        prediction  :   2D numpy array</span>
+<span class="sd">            The prediction that should be evaluated</span>
+<span class="sd">        fm  :   Fixmat</span>
+<span class="sd">            The eyetracking data to evaluate against</span>
+<span class="sd">    Output:</span>
+<span class="sd">        Tuple of prediction scores. The order of the scores is determined</span>
+<span class="sd">        by order of measures.scores.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">prediction</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">NaN</span> <span class="k">for</span> <span class="n">measure</span> <span class="ow">in</span> <span class="n">scores</span><span class="p">]</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">measure</span> <span class="ow">in</span> <span class="n">scores</span><span class="p">:</span>
+        <span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getargspec</span><span class="p">(</span><span class="n">measure</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="o">&gt;</span><span class="mi">2</span><span class="p">:</span>
+            <span class="c"># Filter dictionary, such that only the keys that are </span>
+            <span class="c"># expected by the measure are in it</span>
+            <span class="n">mdict</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="p">[</span><span class="n">mdict</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">key</span><span class="p">:</span><span class="n">value</span><span class="p">})</span> <span class="k">for</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">kw</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()</span> 
+                <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
+            <span class="n">score</span> <span class="o">=</span> <span class="n">measure</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">,</span> <span class="o">**</span><span class="n">mdict</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">=</span> <span class="n">measure</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">)</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">score</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">results</span>
+</div>
+<div class="viewcode-block" id="funky_test_measure"><a class="viewcode-back" href="../../measures.html#ocupy.measures.funky_test_measure">[docs]</a><span class="k">def</span> <span class="nf">funky_test_measure</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">,</span> <span class="n">arg1</span> <span class="o">=</span> <span class="s">&#39;bar&#39;</span><span class="p">,</span> <span class="n">arg2</span><span class="o">=</span><span class="s">&#39;foo&#39;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Measure that can be used for testing</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">arg1</span> <span class="o">+</span> <span class="n">arg2</span>
+    </div>
+<span class="k">def</span> <span class="nf">evaluate_predictions</span><span class="p">(</span><span class="n">stimuli</span><span class="p">):</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">cat</span> <span class="ow">in</span> <span class="n">stimuli</span><span class="p">:</span>
+        <span class="n">score</span> <span class="o">=</span> <span class="p">[</span><span class="n">prediction_scores</span><span class="p">(</span><span class="n">img</span><span class="p">[</span><span class="s">&#39;prediction&#39;</span><span class="p">],</span> <span class="n">img</span><span class="o">.</span><span class="n">fixations</span><span class="p">)</span> 
+            <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="n">cat</span><span class="p">]</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">cat</span><span class="o">.</span><span class="n">category</span><span class="p">:</span> <span class="n">score</span><span class="p">})</span>
+    <span class="k">return</span> <span class="n">results</span>
+
+<div class="viewcode-block" id="kldiv_model"><a class="viewcode-back" href="../../measures.html#ocupy.measures.kldiv_model">[docs]</a><span class="k">def</span> <span class="nf">kldiv_model</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    wraps kldiv functionality for model evaluation</span>
+
+<span class="sd">    input:</span>
+<span class="sd">        prediction: 2D matrix </span>
+<span class="sd">            the model salience map</span>
+<span class="sd">        fm : fixmat </span>
+<span class="sd">            Should be filtered for the image corresponding to the prediction</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">r_x</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_resize_factor</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">)</span>
+    <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">q</span> <span class="o">-=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
+    <span class="n">q</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
+    <span class="k">return</span> <span class="n">kldiv</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">distp</span> <span class="o">=</span> <span class="n">fm</span><span class="p">,</span> <span class="n">scale_factor</span> <span class="o">=</span> <span class="n">r_x</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="kldiv"><a class="viewcode-back" href="../../measures.html#ocupy.measures.kldiv">[docs]</a><span class="k">def</span> <span class="nf">kldiv</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">distp</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">distq</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">scale_factor</span> <span class="o">=</span> <span class="mi">1</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Computes the Kullback-Leibler divergence between two distributions.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">        p : Matrix</span>
+<span class="sd">            The first probability distribution</span>
+<span class="sd">        q : Matrix</span>
+<span class="sd">            The second probability distribution</span>
+<span class="sd">        distp : fixmat</span>
+<span class="sd">            If p is None, distp is used to compute a FDM which </span>
+<span class="sd">            is then taken as 1st probability distribution.</span>
+<span class="sd">        distq : fixmat</span>
+<span class="sd">            If q is None, distq is used to compute a FDM which is </span>
+<span class="sd">            then taken as 2dn probability distribution.</span>
+<span class="sd">        scale_factor : double</span>
+<span class="sd">            Determines the size of FDM computed from distq or distp.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="n">q</span> <span class="o">!=</span> <span class="bp">None</span> <span class="ow">or</span> <span class="n">distq</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">,</span> <span class="s">&quot;Either q or distq have to be given&quot;</span>
+    <span class="k">assert</span> <span class="n">p</span> <span class="o">!=</span> <span class="bp">None</span> <span class="ow">or</span> <span class="n">distp</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">,</span> <span class="s">&quot;Either p or distp have to be given&quot;</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">p</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span> 
+            <span class="n">p</span> <span class="o">=</span> <span class="n">compute_fdm</span><span class="p">(</span><span class="n">distp</span><span class="p">,</span> <span class="n">scale_factor</span> <span class="o">=</span> <span class="n">scale_factor</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">q</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="n">compute_fdm</span><span class="p">(</span><span class="n">distq</span><span class="p">,</span> <span class="n">scale_factor</span> <span class="o">=</span> <span class="n">scale_factor</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">NoFixations</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">NaN</span>
+
+    <span class="n">q</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span>
+    <span class="n">p</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span> 
+    <span class="n">kl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span> <span class="n">p</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="n">q</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">kl</span>
+  </div>
+<div class="viewcode-block" id="kldiv_cs_model"><a class="viewcode-back" href="../../measures.html#ocupy.measures.kldiv_cs_model">[docs]</a><span class="k">def</span> <span class="nf">kldiv_cs_model</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Computes Chao-Shen corrected KL-divergence between prediction </span>
+<span class="sd">    and fdm made from fixations in fm.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters :</span>
+<span class="sd">        prediction : np.ndarray</span>
+<span class="sd">            a fixation density map</span>
+<span class="sd">        fm : FixMat object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c"># compute histogram of fixations needed for ChaoShen corrected kl-div</span>
+    <span class="c"># image category must exist (&gt;-1) and image_size must be non-empty</span>
+    <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span>
+        <span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="k">assert</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fm</span><span class="o">.</span><span class="n">category</span><span class="p">)</span>
+    <span class="c"># check whether fixmat contains fixations</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="o">==</span>  <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">NaN</span>
+    <span class="p">(</span><span class="n">scale_factor</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_resize_factor</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">)</span>
+    <span class="c"># this specifies left edges of the histogram bins, i.e. fixations between</span>
+    <span class="c"># ]0 binedge[0]] are included. --&gt; fixations are ceiled</span>
+    <span class="n">e_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">scale_factor</span><span class="o">*</span><span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">e_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">scale_factor</span><span class="o">*</span><span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">zip</span><span class="p">((</span><span class="n">scale_factor</span><span class="o">*</span><span class="n">fm</span><span class="o">.</span><span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="n">scale_factor</span><span class="o">*</span><span class="n">fm</span><span class="o">.</span><span class="n">x</span><span class="p">)))</span>
+    <span class="p">(</span><span class="n">fdm</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogramdd</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="p">(</span><span class="n">e_y</span><span class="p">,</span> <span class="n">e_x</span><span class="p">))</span>
+
+    <span class="c"># compute ChaoShen corrected kl-div</span>
+    <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">copy</span> <span class="o">=</span> <span class="bp">True</span><span class="p">)</span>
+    <span class="n">q</span><span class="p">[</span><span class="n">q</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span>
+    <span class="n">q</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+    <span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">pa</span><span class="p">,</span> <span class="n">la</span><span class="p">)</span> <span class="o">=</span> <span class="n">chao_shen</span><span class="p">(</span><span class="n">fdm</span><span class="p">)</span>
+    <span class="n">q</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="n">fdm</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">cross_entropy</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">pa</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">q</span><span class="p">))</span> <span class="o">/</span> <span class="n">la</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">cross_entropy</span> <span class="o">-</span> <span class="n">H</span><span class="p">)</span>
+    
+</div>
+<div class="viewcode-block" id="chao_shen"><a class="viewcode-back" href="../../measures.html#ocupy.measures.chao_shen">[docs]</a><span class="k">def</span> <span class="nf">chao_shen</span><span class="p">(</span><span class="n">q</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Computes some terms needed for the Chao-Shen KL correction.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">yx</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="n">q</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span> <span class="c"># remove bins with zero counts</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">yx</span><span class="p">)</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">yx</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">/</span><span class="n">n</span>
+    <span class="n">f1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">yx</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="c"># number of singletons in the sample</span>
+    <span class="k">if</span> <span class="n">f1</span> <span class="o">==</span> <span class="n">n</span><span class="p">:</span> <span class="c"># avoid C == 0</span>
+        <span class="n">f1</span> <span class="o">-=</span> <span class="mi">1</span>
+    <span class="n">C</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="n">f1</span><span class="o">/</span><span class="n">n</span><span class="p">)</span> <span class="c"># estimated coverage of the sample</span>
+    <span class="n">pa</span> <span class="o">=</span> <span class="n">C</span> <span class="o">*</span> <span class="n">p</span>  <span class="c"># coverage adjusted empirical frequencies</span>
+    <span class="n">la</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">pa</span><span class="p">)</span> <span class="o">**</span> <span class="n">n</span><span class="p">)</span>  <span class="c"># probability to see a bin (species) in the sample</span>
+    <span class="n">H</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">pa</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">pa</span><span class="p">))</span> <span class="o">/</span> <span class="n">la</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">H</span><span class="p">,</span> <span class="n">pa</span><span class="p">,</span> <span class="n">la</span><span class="p">)</span>
+ 
+</div>
+<div class="viewcode-block" id="correlation_model"><a class="viewcode-back" href="../../measures.html#ocupy.measures.correlation_model">[docs]</a><span class="k">def</span> <span class="nf">correlation_model</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    wraps numpy.corrcoef functionality for model evaluation</span>
+
+<span class="sd">    input:</span>
+<span class="sd">        prediction: 2D Matrix </span>
+<span class="sd">            the model salience map</span>
+<span class="sd">        fm: fixmat </span>
+<span class="sd">            Used to compute a FDM to which the prediction is compared.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">r_x</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_resize_factor</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">)</span>
+    <span class="n">fdm</span> <span class="o">=</span> <span class="n">compute_fdm</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span> <span class="n">scale_factor</span> <span class="o">=</span> <span class="n">r_x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">corrcoef</span><span class="p">(</span><span class="n">fdm</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">prediction</span><span class="o">.</span><span class="n">flatten</span><span class="p">())[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span>
+    
+    </div>
+<div class="viewcode-block" id="nss_model"><a class="viewcode-back" href="../../measures.html#ocupy.measures.nss_model">[docs]</a><span class="k">def</span> <span class="nf">nss_model</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    wraps nss functionality for model evaluation</span>
+<span class="sd">    </span>
+<span class="sd">    input:</span>
+<span class="sd">        prediction: 2D matrix</span>
+<span class="sd">            the model salience map</span>
+<span class="sd">        fm : fixmat</span>
+<span class="sd">            Fixations that define the actuals</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="p">(</span><span class="n">r_y</span><span class="p">,</span> <span class="n">r_x</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_resize_factor</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">)</span>
+    <span class="n">fix</span> <span class="o">=</span> <span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">y</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">r_y</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">),</span>
+                            <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">x</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">r_x</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">nss</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fix</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="nss"><a class="viewcode-back" href="../../measures.html#ocupy.measures.nss">[docs]</a><span class="k">def</span> <span class="nf">nss</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fix</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the normalized scanpath salience</span>
+
+<span class="sd">    input:</span>
+<span class="sd">        fix : list, l[0] contains y, l[1] contains x</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">prediction</span> <span class="o">=</span> <span class="n">prediction</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">prediction</span><span class="p">)</span>
+    <span class="n">prediction</span> <span class="o">=</span> <span class="n">prediction</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">prediction</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">prediction</span><span class="p">[</span><span class="n">fix</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">fix</span><span class="p">[</span><span class="mi">1</span><span class="p">]])</span>
+
+</div>
+<div class="viewcode-block" id="roc_model"><a class="viewcode-back" href="../../measures.html#ocupy.measures.roc_model">[docs]</a><span class="k">def</span> <span class="nf">roc_model</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">,</span> <span class="n">ctr_loc</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">ctr_size</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    wraps roc functionality for model evaluation</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        prediction: 2D array</span>
+<span class="sd">            the model salience map</span>
+<span class="sd">        fm : fixmat</span>
+<span class="sd">            Fixations that define locations of the actuals</span>
+<span class="sd">        ctr_loc : tuple of (y.x) coordinates, optional</span>
+<span class="sd">            Allows to specify control points for spatial </span>
+<span class="sd">            bias correction</span>
+<span class="sd">        ctr_size : two element tuple, optional</span>
+<span class="sd">            Specifies the assumed image size of the control locations,</span>
+<span class="sd">            defaults to fm.image_size</span>
+<span class="sd">     &quot;&quot;&quot;</span>
+
+    <span class="c"># check if prediction is a valid numpy array</span>
+    <span class="k">assert</span> <span class="nb">type</span><span class="p">(</span><span class="n">prediction</span><span class="p">)</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="c"># check whether scaling preserved aspect ratio</span>
+    <span class="p">(</span><span class="n">r_y</span><span class="p">,</span> <span class="n">r_x</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_resize_factor</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">)</span>
+    <span class="c"># read out values in the fdm at actual fixation locations</span>
+    <span class="c"># .astype(int) floors numbers in np.array</span>
+    <span class="n">y_index</span> <span class="o">=</span> <span class="p">(</span><span class="n">r_y</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">y</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">x_index</span> <span class="o">=</span> <span class="p">(</span><span class="n">r_x</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">x</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">actuals</span> <span class="o">=</span> <span class="n">prediction</span><span class="p">[</span><span class="n">y_index</span><span class="p">,</span> <span class="n">x_index</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ctr_loc</span><span class="p">:</span> 
+        <span class="n">xc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">prediction</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">1000</span><span class="p">)</span>
+        <span class="n">yc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">prediction</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1000</span><span class="p">)</span>
+        <span class="n">ctr_loc</span> <span class="o">=</span> <span class="p">(</span><span class="n">yc</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">),</span> <span class="n">xc</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ctr_size</span><span class="p">:</span>
+            <span class="n">ctr_size</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="p">(</span><span class="n">r_y</span><span class="p">,</span> <span class="n">r_x</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_resize_factor</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">ctr_size</span><span class="p">)</span>
+        <span class="n">ctr_loc</span> <span class="o">=</span> <span class="p">((</span><span class="n">r_y</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ctr_loc</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">),</span> 
+                   <span class="p">(</span><span class="n">r_x</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ctr_loc</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">))</span>
+    <span class="n">controls</span> <span class="o">=</span> <span class="n">prediction</span><span class="p">[</span><span class="n">ctr_loc</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ctr_loc</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+
+    <span class="k">return</span> <span class="n">fast_roc</span><span class="p">(</span><span class="n">actuals</span><span class="p">,</span> <span class="n">controls</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    
+</div>
+<div class="viewcode-block" id="fast_roc"><a class="viewcode-back" href="../../measures.html#ocupy.measures.fast_roc">[docs]</a><span class="k">def</span> <span class="nf">fast_roc</span><span class="p">(</span><span class="n">actuals</span><span class="p">,</span> <span class="n">controls</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    approximates the area under the roc curve for sets of actuals and controls.</span>
+<span class="sd">    Uses all values appearing in actuals as thresholds and lower sum </span>
+<span class="sd">    interpolation. Also returns arrays of the true positive rate and the false</span>
+<span class="sd">    positive rate that can be used for plotting the roc curve.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        actuals : list</span>
+<span class="sd">            A list of numeric values for positive observations.</span>
+<span class="sd">        controls : list</span>
+<span class="sd">            A list of numeric values for negative observations.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">actuals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">actuals</span><span class="p">)</span>
+    <span class="n">controls</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">controls</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">actuals</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&#39;NaN found in actuals&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">controls</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&#39;NaN found in controls&#39;</span><span class="p">)</span>
+
+    <span class="n">thresholds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">actuals</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">])[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">true_pos_rate</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">thresholds</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">false_pos_rate</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">thresholds</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">num_act</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">actuals</span><span class="p">))</span>
+    <span class="n">num_ctr</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">controls</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">thresholds</span><span class="p">):</span>
+        <span class="n">true_pos_rate</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">actuals</span> <span class="o">&gt;=</span> <span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">num_act</span>
+        <span class="n">false_pos_rate</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">controls</span> <span class="o">&gt;=</span> <span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">num_ctr</span>
+    <span class="n">auc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">false_pos_rate</span><span class="p">),</span> <span class="n">true_pos_rate</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="c"># treat cases where TPR of one is not reached before FPR of one</span>
+    <span class="c"># by using trapezoidal integration for the last segment</span>
+    <span class="c"># (add the missing triangle)</span>
+    <span class="k">if</span> <span class="n">false_pos_rate</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">auc</span> <span class="o">+=</span> <span class="p">((</span><span class="mi">1</span><span class="o">-</span><span class="n">true_pos_rate</span><span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">])</span><span class="o">*.</span><span class="mi">5</span><span class="o">*</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">false_pos_rate</span><span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">]))</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">auc</span><span class="p">,</span> <span class="n">true_pos_rate</span><span class="p">,</span> <span class="n">false_pos_rate</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="exact_roc"><a class="viewcode-back" href="../../measures.html#ocupy.measures.exact_roc">[docs]</a><span class="k">def</span> <span class="nf">exact_roc</span><span class="p">(</span><span class="n">actuals</span><span class="p">,</span> <span class="n">controls</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    computes the area under the roc curve for separating to sets. Uses all</span>
+<span class="sd">    possibl thresholds and trapezoidal interpolation. Also returns arrays of</span>
+<span class="sd">    the true positive rate and the false positive rate.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">actuals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">actuals</span><span class="p">)</span>
+    <span class="n">controls</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">controls</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">actuals</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&#39;NaN found in actuals&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">controls</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&#39;NaN found in controls&#39;</span><span class="p">)</span>
+
+    <span class="n">thresholds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">actuals</span><span class="p">,</span><span class="n">controls</span><span class="p">))),</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">])[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">true_pos_rate</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">thresholds</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">false_pos_rate</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">thresholds</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">num_act</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">actuals</span><span class="p">))</span>
+    <span class="n">num_ctr</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">controls</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">thresholds</span><span class="p">):</span>
+        <span class="n">true_pos_rate</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">actuals</span> <span class="o">&gt;=</span> <span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">num_act</span>
+        <span class="n">false_pos_rate</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">controls</span> <span class="o">&gt;=</span> <span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">num_ctr</span>
+    <span class="n">auc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">false_pos_rate</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">true_pos_rate</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">true_pos_rate</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span><span class="p">(</span><span class="n">auc</span><span class="p">,</span> <span class="n">true_pos_rate</span><span class="p">,</span> <span class="n">false_pos_rate</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="emd_model"><a class="viewcode-back" href="../../measures.html#ocupy.measures.emd_model">[docs]</a><span class="k">def</span> <span class="nf">emd_model</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    wraps emd functionality for model evaluation</span>
+<span class="sd">    </span>
+<span class="sd">    requires:</span>
+<span class="sd">        OpenCV python bindings</span>
+<span class="sd">        </span>
+<span class="sd">    input:</span>
+<span class="sd">        prediction: the model salience map</span>
+<span class="sd">        fm : fixmat filtered for the image corresponding to the prediction</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">r_x</span><span class="p">)</span> <span class="o">=</span> <span class="n">calc_resize_factor</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">)</span>
+    <span class="n">gt</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">compute_fdm</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span> <span class="n">scale_factor</span> <span class="o">=</span> <span class="n">r_x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">emd</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">gt</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="emd"><a class="viewcode-back" href="../../measures.html#ocupy.measures.emd">[docs]</a><span class="k">def</span> <span class="nf">emd</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">ground_truth</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">    Compute the Eart Movers Distance between prediction and model.</span>
+<span class="sd">    </span>
+<span class="sd">    This implementation uses opencv for doing the actual work.</span>
+<span class="sd">    Unfortunately, at the time of implementation only the SWIG</span>
+<span class="sd">    bindings werer available and the numpy arrays have to</span>
+<span class="sd">    converted by hand. This changes with opencv 2.1.  &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">opencv</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">prediction</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">ground_truth</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&#39;Shapes of prediction and ground truth have&#39;</span> <span class="o">+</span>
+                           <span class="s">&#39; to be equal. They are: </span><span class="si">%s</span><span class="s">, </span><span class="si">%s</span><span class="s">&#39;</span>
+                            <span class="o">%</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">prediction</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">ground_truth</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
+    <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">prediction</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                        <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">prediction</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>    
+    <span class="n">s1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">y</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">prediction</span><span class="o">.</span><span class="n">flatten</span><span class="p">()])</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">s2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">y</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="n">ground_truth</span><span class="o">.</span><span class="n">flatten</span><span class="p">()])</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">s1m</span> <span class="o">=</span> <span class="n">opencv</span><span class="o">.</span><span class="n">cvCreateMat</span><span class="p">(</span><span class="n">s1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">s2</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">opencv</span><span class="o">.</span><span class="n">CV_32FC1</span><span class="p">)</span>
+    <span class="n">s2m</span> <span class="o">=</span> <span class="n">opencv</span><span class="o">.</span><span class="n">cvCreateMat</span><span class="p">(</span><span class="n">s1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">s2</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">opencv</span><span class="o">.</span><span class="n">CV_32FC1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">s1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">s1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">s1m</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="n">c</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">s1</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="n">c</span><span class="p">])</span>
+            <span class="n">s2m</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="n">c</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">s2</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="n">c</span><span class="p">])</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">opencv</span><span class="o">.</span><span class="n">cvCalcEMD2</span><span class="p">(</span><span class="n">s1m</span><span class="p">,</span> <span class="n">s2m</span><span class="p">,</span> <span class="n">opencv</span><span class="o">.</span><span class="n">CV_DIST_L2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">d</span>
+
+<span class="c"># Default list of measures </span></div>
+<span class="n">scores</span> <span class="o">=</span> <span class="p">[</span><span class="n">roc_model</span><span class="p">,</span> <span class="n">nss_model</span><span class="p">,</span> <span class="n">kldiv_model</span><span class="p">]</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../index.html">
+              <img class="logo" src="../../_static/logo.png" alt="Logo"/>
+            </a></p>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ocupy v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, WhiteMatter Labs GmbH.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>

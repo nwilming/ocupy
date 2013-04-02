@@ -1,0 +1,375 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>ocupy.stimuli &mdash; ocupy v0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="ocupy v0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ocupy v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for ocupy.stimuli</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/env python</span>
+<span class="sd">&quot;&quot;&quot;This module implements different model evaluation measures.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">ocupy.utils</span> <span class="kn">import</span> <span class="n">ismember</span>
+
+
+<div class="viewcode-block" id="Categories"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Categories">[docs]</a><span class="k">class</span> <span class="nc">Categories</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;This class represents different categories of stimuli.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loader</span><span class="p">,</span> <span class="n">img_per_cat</span><span class="p">,</span> <span class="n">features</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">fixations</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loader</span> <span class="o">=</span> <span class="n">loader</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_features</span> <span class="o">=</span> <span class="n">features</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span> <span class="o">=</span> <span class="n">fixations</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_img_per_cat</span> <span class="o">=</span> <span class="n">img_per_cat</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">imgs</span><span class="p">)</span> <span class="ow">in</span> <span class="n">img_per_cat</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">k</span><span class="p">:</span><span class="n">Images</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> 
+                <span class="n">imgs</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span><span class="n">features</span><span class="p">,</span><span class="n">fixations</span><span class="p">)})</span>
+    
+<div class="viewcode-block" id="Categories.content"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Categories.content">[docs]</a>    <span class="k">def</span> <span class="nf">content</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return category numbers and associated file numbers.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_img_per_cat</span>
+</div>
+    <span class="k">def</span> <span class="nf">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+     
+    <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">i</span>
+    
+<div class="viewcode-block" id="Categories.categories"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Categories.categories">[docs]</a>    <span class="k">def</span> <span class="nf">categories</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a list of category numbers</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+</div>
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s">&#39;The requested Category was not &#39;</span>
+                <span class="o">+</span> <span class="s">&#39;specified beforehand&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        
+    <span class="nd">@property</span>
+<div class="viewcode-block" id="Categories.fixations"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Categories.fixations">[docs]</a>    <span class="k">def</span> <span class="nf">fixations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Filter the fixmat such that it only contains fixations on images</span>
+<span class="sd">        in categories that are also in the categories object&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&#39;This Images object does not have&#39;</span>
+                <span class="o">+</span><span class="s">&#39; an associated fixmat&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s">&#39;bool&#39;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">cat</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+                <span class="n">idx</span> <span class="o">=</span> <span class="n">idx</span> <span class="o">|</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="n">cat</span><span class="p">))</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+</div></div>
+<div class="viewcode-block" id="Images"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Images">[docs]</a><span class="k">class</span> <span class="nc">Images</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Represents all stimuli that are in a category.</span>
+<span class="sd">    &quot;&quot;&quot;</span> 
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loader</span><span class="p">,</span> <span class="n">images</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> 
+                 <span class="n">features</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">fixations</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loader</span> <span class="o">=</span> <span class="n">loader</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">category</span> <span class="o">=</span> <span class="n">category</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_features</span> <span class="o">=</span> <span class="n">features</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span> <span class="o">=</span> <span class="n">fixations</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_images</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="n">images</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">img</span><span class="p">:</span> <span class="n">Image</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> 
+                <span class="n">img</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">fixations</span><span class="p">)})</span>
+ 
+    <span class="k">def</span> <span class="nf">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+     
+    <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">i</span>
+
+<div class="viewcode-block" id="Images.images"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Images.images">[docs]</a>    <span class="k">def</span> <span class="nf">images</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a list image numbers.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+       </div>
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s">&#39;The requested Image was not specified&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+    
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">fixations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&#39;This Images object does not have&#39;</span>
+                <span class="o">+</span><span class="s">&#39; an associated fixmat&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="p">[(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">)</span> <span class="o">&amp;</span>
+                <span class="n">ismember</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="o">.</span><span class="n">filenumber</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="o">.</span><span class="n">keys</span><span class="p">())]</span>   
+</div>
+<div class="viewcode-block" id="Image"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Image">[docs]</a><span class="k">class</span> <span class="nc">Image</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Represents a single stimulus</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loader</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> <span class="n">image</span><span class="p">,</span> 
+                 <span class="n">features</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">fixations</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loader</span> <span class="o">=</span> <span class="n">loader</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">category</span> <span class="o">=</span> <span class="n">category</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">image</span> <span class="o">=</span> <span class="n">image</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">features</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_features</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_features</span> <span class="o">=</span> <span class="n">features</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span> <span class="o">=</span> <span class="n">fixations</span>
+     
+    <span class="k">def</span> <span class="nf">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_features</span>
+     
+    <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_features</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="bp">self</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+<div class="viewcode-block" id="Image.features"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Image.features">[docs]</a>    <span class="k">def</span> <span class="nf">features</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns features associated to this image.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_features</span>
+   </div>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the image data for this ctegory/image combination.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">loader</span><span class="o">.</span><span class="n">get_image</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="p">)</span>
+    
+    <span class="nd">@data.setter</span>
+<div class="viewcode-block" id="Image.data"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Image.data">[docs]</a>    <span class="k">def</span> <span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves a new image to disk</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loader</span><span class="o">.</span><span class="n">save_image</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+    </div>
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_features</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s">&#39;The feature was not specified beforehand&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">loader</span><span class="o">.</span><span class="n">test_for_feature</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s">&#39;Cannot load Feature </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="p">))</span>
+        <span class="n">feature</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loader</span><span class="o">.</span><span class="n">get_feature</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">feature</span>
+    
+    <span class="k">def</span> <span class="nf">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c"># when models make new predictions it can be usefull to add new items</span>
+        <span class="c"># to the feature set. I.e. a prediciton of the model.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_features</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_features</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">loader</span><span class="o">.</span><span class="n">save_feature</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">),</span> 
+                                 <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="p">),</span> 
+                                 <span class="n">key</span><span class="p">,</span> 
+                                 <span class="n">value</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+<div class="viewcode-block" id="Image.fixations"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.Image.fixations">[docs]</a>    <span class="k">def</span> <span class="nf">fixations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns all fixations that are on this image.</span>
+<span class="sd">        A precondition for this to work is that a fixmat </span>
+<span class="sd">        is associated with this Image object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&#39;This Images object does not have&#39;</span>
+                <span class="o">+</span><span class="s">&#39; an associated fixmat&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="p">[(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">)</span> <span class="o">&amp;</span>
+                               <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fixations</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="p">)]</span>
+
+</div></div>
+<div class="viewcode-block" id="FixmatStimuliFactory"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.FixmatStimuliFactory">[docs]</a><span class="k">def</span> <span class="nf">FixmatStimuliFactory</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span> <span class="n">loader</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Constructs an categories object for all image / category </span>
+<span class="sd">    combinations in the fixmat.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        fm: FixMat</span>
+<span class="sd">            Used for extracting valid category/image combination.</span>
+<span class="sd">        loader: loader</span>
+<span class="sd">            Loader that accesses the stimuli for this fixmat</span>
+<span class="sd"> </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        Categories object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c"># Find all feature names</span>
+    <span class="n">features</span> <span class="o">=</span> <span class="p">[]</span> 
+    <span class="k">if</span> <span class="n">loader</span><span class="o">.</span><span class="n">ftrpath</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">loader</span><span class="o">.</span><span class="n">ftrpath</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">R_OK</span><span class="p">)</span>   
+        <span class="n">features</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">loader</span><span class="o">.</span><span class="n">ftrpath</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">category</span><span class="p">[</span><span class="mi">0</span><span class="p">])))</span>
+    <span class="c"># Find all images in all categories   </span>
+    <span class="n">img_per_cat</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">cat</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">category</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">loader</span><span class="o">.</span><span class="n">test_for_category</span><span class="p">(</span><span class="n">cat</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;Category </span><span class="si">%s</span><span class="s"> is specified in fixmat but &#39;</span><span class="o">%</span><span class="p">(</span>
+                                <span class="nb">str</span><span class="p">(</span><span class="n">cat</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39;can not be located by loader&#39;</span><span class="p">))</span>
+        <span class="n">img_per_cat</span><span class="p">[</span><span class="n">cat</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">fm</span><span class="p">[(</span><span class="n">fm</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="n">cat</span><span class="p">)]</span><span class="o">.</span><span class="n">filenumber</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">loader</span><span class="o">.</span><span class="n">test_for_image</span><span class="p">(</span><span class="n">cat</span><span class="p">,</span> <span class="n">img</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&#39;Image </span><span class="si">%s</span><span class="s"> in category </span><span class="si">%s</span><span class="s"> is &#39;</span><span class="o">%</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">cat</span><span class="p">),</span> 
+                    <span class="nb">str</span><span class="p">(</span><span class="n">img</span><span class="p">))</span> <span class="o">+</span> 
+                    <span class="s">&#39;specified in fixmat but can be located by loader&#39;</span><span class="p">)</span>
+            <span class="n">img_per_cat</span><span class="p">[</span><span class="n">cat</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">loader</span><span class="o">.</span><span class="n">ftrpath</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">features</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">loader</span><span class="o">.</span><span class="n">test_for_feature</span><span class="p">(</span><span class="n">cat</span><span class="p">,</span> <span class="n">img</span><span class="p">,</span> <span class="n">feature</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                            <span class="s">&#39;Feature </span><span class="si">%s</span><span class="s"> for image </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">feature</span><span class="p">),</span><span class="nb">str</span><span class="p">(</span><span class="n">img</span><span class="p">))</span> <span class="o">+</span>
+                            <span class="s">&#39; in category </span><span class="si">%s</span><span class="s"> &#39;</span> <span class="o">%</span><span class="nb">str</span><span class="p">(</span><span class="n">cat</span><span class="p">)</span> <span class="o">+</span>
+                            <span class="s">&#39;can not be located by loader&#39;</span><span class="p">)</span> 
+    <span class="k">return</span> <span class="n">Categories</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> <span class="n">img_per_cat</span> <span class="o">=</span> <span class="n">img_per_cat</span><span class="p">,</span>
+         <span class="n">features</span> <span class="o">=</span> <span class="n">features</span><span class="p">,</span> <span class="n">fixations</span> <span class="o">=</span> <span class="n">fm</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="DirectoryStimuliFactory"><a class="viewcode-back" href="../../stimuli.html#ocupy.stimuli.DirectoryStimuliFactory">[docs]</a><span class="k">def</span> <span class="nf">DirectoryStimuliFactory</span><span class="p">(</span><span class="n">loader</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Takes an input path to the images folder of an experiment and generates</span>
+<span class="sd">    automatically the category - filenumber list needed to construct an</span>
+<span class="sd">    appropriate _categories object.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters :</span>
+<span class="sd">        loader : Loader object which contains </span>
+<span class="sd">            impath : string</span>
+<span class="sd">                path to the input, i.e. image-, files of the experiment. All</span>
+<span class="sd">                subfolders in that path will be treated as categories. If no</span>
+<span class="sd">                subfolders are present, category 1 will be assigned and all </span>
+<span class="sd">                files in the folder are considered input images. </span>
+<span class="sd">                Images have to end in &#39;.png&#39;.</span>
+<span class="sd">            ftrpath : string</span>
+<span class="sd">                path to the feature folder. It is expected that the folder</span>
+<span class="sd">                structure corresponds to the structure in impath, i.e. </span>
+<span class="sd">                    ftrpath/category/featurefolder/featuremap.mat</span>
+<span class="sd">                Furthermore, features are assumed to be the same for all </span>
+<span class="sd">                categories.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">impath</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">impath</span>
+    <span class="n">ftrpath</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">ftrpath</span>
+    <span class="c"># checks whether user has reading permission for the path</span>
+    <span class="k">assert</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">impath</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">R_OK</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">ftrpath</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">R_OK</span><span class="p">)</span>    
+
+    <span class="c"># EXTRACTING IMAGE NAMES</span>
+    <span class="n">img_per_cat</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="c"># extract only directories in the given folder</span>
+    <span class="n">subfolders</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">impath</span><span class="p">)</span> <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">impath</span><span class="p">,</span> <span class="n">name</span><span class="p">))]</span>
+    <span class="c"># if there are no subfolders, walk through files. Take 1 as key for the </span>
+    <span class="c"># categories object</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">subfolders</span><span class="p">:</span>
+        <span class="p">[</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">impath</span><span class="p">))</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+        <span class="c"># this only takes entries that end with &#39;.png&#39;</span>
+        <span class="n">entries</span> <span class="o">=</span> <span class="p">{</span><span class="mi">1</span><span class="p">:</span> 
+            <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">cur_file</span><span class="p">[</span><span class="n">cur_file</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s">&#39;_&#39;</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">4</span><span class="p">])</span> <span class="k">for</span> <span class="n">cur_file</span>
+            <span class="ow">in</span> <span class="n">files</span> <span class="k">if</span> <span class="n">cur_file</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s">&#39;.png&#39;</span><span class="p">)]}</span>
+        <span class="n">img_per_cat</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">entries</span><span class="p">)</span>
+        <span class="n">subfolders</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;&#39;</span><span class="p">]</span>
+    <span class="c"># if there are subfolders, walk through them</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">directory</span> <span class="ow">in</span> <span class="n">subfolders</span><span class="p">:</span>
+            <span class="p">[</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">impath</span><span class="p">,</span> <span class="n">directory</span><span class="p">))</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+            <span class="c"># this only takes entries that end with &#39;.png&#39;. Strips ending and</span>
+            <span class="c"># considers everything after the first &#39;_&#39; as the imagenumber</span>
+            <span class="n">imagenumbers</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">cur_file</span><span class="p">[</span><span class="n">cur_file</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s">&#39;_&#39;</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">4</span><span class="p">])</span> 
+                    <span class="k">for</span> <span class="n">cur_file</span> <span class="ow">in</span> <span class="n">files</span>
+                        <span class="k">if</span> <span class="p">(</span><span class="n">cur_file</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s">&#39;.png&#39;</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cur_file</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">4</span><span class="p">))]</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span> <span class="n">imagenumbers</span><span class="p">}</span>
+            <span class="n">img_per_cat</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">entries</span><span class="p">)</span>
+            <span class="k">del</span> <span class="n">directory</span>
+    <span class="k">del</span> <span class="n">imagenumbers</span>
+
+    <span class="c"># in case subfolders do not exist, &#39;&#39; is appended here.</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">files</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ftrpath</span><span class="p">,</span> 
+                                            <span class="n">subfolders</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">Categories</span><span class="p">(</span><span class="n">loader</span><span class="p">,</span> <span class="n">img_per_cat</span> <span class="o">=</span> <span class="n">img_per_cat</span><span class="p">,</span> <span class="n">features</span> <span class="o">=</span> <span class="n">features</span><span class="p">)</span>
+    </div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../index.html">
+              <img class="logo" src="../../_static/logo.png" alt="Logo"/>
+            </a></p>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ocupy v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, WhiteMatter Labs GmbH.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>

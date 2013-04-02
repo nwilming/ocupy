@@ -1,0 +1,766 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>ocupy.fixmat &mdash; ocupy v0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="ocupy v0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ocupy v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for ocupy.fixmat</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/env python</span>
+<span class="sd">&quot;&quot;&quot;This module implements the FixMat Structure for managing eye-tracking data.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span>
+<span class="kn">from</span> <span class="nn">warnings</span> <span class="kn">import</span> <span class="n">warn</span>
+<span class="kn">import</span> <span class="nn">cPickle</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.io</span> <span class="kn">import</span> <span class="n">loadmat</span>
+<span class="kn">from</span> <span class="nn">scipy.ndimage.filters</span> <span class="kn">import</span> <span class="n">gaussian_filter</span>
+
+
+<div class="viewcode-block" id="FixMat"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat">[docs]</a><span class="k">class</span> <span class="nc">FixMat</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Represents fixation data. </span>
+<span class="sd">    The fixmat object presents the fixation data as lists of values to the </span>
+<span class="sd">    user. In general fixation data consists of fixations that have several</span>
+<span class="sd">    attributes. A fixation for example has a x and y position, but is also</span>
+<span class="sd">    associated with the image that was being viewed while the fixation</span>
+<span class="sd">    was made. The data can be accessed as attributes of the fixmat::</span>
+
+<span class="sd">        &gt;&gt;&gt; fixmat.x    # Returns a list of x-coordinates</span>
+<span class="sd">        &gt;&gt;&gt; fixmat.y    # Returns a list of y-coordinates</span>
+
+<span class="sd">    In this case a single index into anyone of these lists represents a </span>
+<span class="sd">    fixation:</span>
+
+<span class="sd">        &gt;&gt;&gt; (fixmat.x[0], fixmat.y[0])  </span>
+
+
+<span class="sd">    .. note:: It is never neccessary to create a FixMat object directly. </span>
+<span class="sd">        This is handled by Fixmat factories.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span> 
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">categories</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">fixmat</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">index</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a new fixmat from an existing one</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            categories : optional, instance of stimuli.Categories,</span>
+<span class="sd">                allows direct access to image data via the fixmat</span>
+<span class="sd">            fixmat : instance of fixmat.FixMat, optional</span>
+<span class="sd">                if given, the existing fixmat is copied and only thos fixations</span>
+<span class="sd">                that are marked True in index are retained.</span>
+<span class="sd">            index : list of True or False, same length as fields of fixmat</span>
+<span class="sd">                Indicates which fixations should be used for the new fixmat and</span>
+<span class="sd">                which should be ignored</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_subjects</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span> <span class="o">=</span> <span class="n">categories</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">fixmat</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">index</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="n">index</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">(</span><span class="s">&quot;Index vector for &quot;</span> <span class="o">+</span>
+                <span class="s">&quot;filtering has to have the same length as the fields of the fixmat&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subjects</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">_subjects</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">_fields</span>
+            <span class="k">for</span>  <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">][</span><span class="n">index</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">_parameters</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">_parameters</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">param</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_num_fix</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="s">&quot;Fixmat with </span><span class="si">%i</span><span class="s"> fixations and the following data fields:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                                                                    <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">))</span>
+        <span class="n">desc</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="si">%s</span><span class="s"> | </span><span class="si">%s</span><span class="s"> | </span><span class="si">%s</span><span class="s"> | </span><span class="si">%s</span><span class="s"> </span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="s">&#39;Field Name&#39;</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="mi">20</span><span class="p">),</span>
+                                          <span class="s">&#39;Length&#39;</span><span class="o">.</span><span class="n">center</span><span class="p">(</span><span class="mi">13</span><span class="p">),</span> 
+                                          <span class="s">&#39;Type&#39;</span><span class="o">.</span><span class="n">center</span><span class="p">(</span><span class="mi">10</span><span class="p">),</span> 
+                                          <span class="s">&#39;Values&#39;</span><span class="o">.</span><span class="n">center</span><span class="p">(</span><span class="mi">20</span><span class="p">))</span>
+        <span class="n">desc</span> <span class="o">+=</span> <span class="s">&quot;---------------------+---------------+------------+----------------</span><span class="se">\n</span><span class="s">&quot;</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="n">num_uniques</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">])</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">num_uniques</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
+                <span class="n">num_uniques</span> <span class="o">=</span> <span class="s">&#39;Many&#39;</span>
+            <span class="n">desc</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="si">%s</span><span class="s"> | </span><span class="si">%s</span><span class="s"> | </span><span class="si">%s</span><span class="s"> | </span><span class="si">%s</span><span class="s"> </span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="mi">20</span><span class="p">),</span> 
+                                    <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]))</span><span class="o">.</span><span class="n">center</span><span class="p">(</span><span class="mi">13</span><span class="p">),</span>
+                                    <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">center</span><span class="p">(</span><span class="mi">10</span><span class="p">),</span>
+                                    <span class="nb">str</span><span class="p">(</span><span class="n">num_uniques</span><span class="p">)</span><span class="o">.</span><span class="n">center</span><span class="p">(</span><span class="mi">20</span><span class="p">))</span>
+        <span class="n">desc</span> <span class="o">+=</span> <span class="s">&quot;---------------------+---------------+------------+----------------</span><span class="se">\n</span><span class="s">&quot;</span>
+        <span class="n">desc</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="si">%s</span><span class="s"> | </span><span class="si">%s</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="s">&#39;Parameter Name&#39;</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="mi">20</span><span class="p">),</span> <span class="s">&#39;Value&#39;</span><span class="o">.</span><span class="n">ljust</span><span class="p">(</span><span class="mi">20</span><span class="p">))</span>
+        <span class="n">desc</span> <span class="o">+=</span> <span class="s">&quot;---------------------+---------------------------------------------</span><span class="se">\n</span><span class="s">&quot;</span>
+        <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span><span class="p">:</span>
+            <span class="n">desc</span> <span class="o">+=</span> <span class="s">&#39;</span><span class="si">%s</span><span class="s"> | </span><span class="si">%s</span><span class="s"> </span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">param</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="mi">20</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">param</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="n">desc</span> 
+   
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a filtered fixmat which only includes fixation that are</span>
+<span class="sd">        allowed by index </span>
+<span class="sd">        </span>
+<span class="sd">        Parameters:</span>
+<span class="sd">            index : numpy array</span>
+<span class="sd">                A logical array that is True for fixations that are in </span>
+<span class="sd">                the returned fixmat and False for fixations that are </span>
+<span class="sd">                excluded.</span>
+<span class="sd">        </span>
+<span class="sd">        Notes:</span>
+<span class="sd">            See fixmat.filter for more info.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c">#if isinstance(key, IntType):</span>
+        <span class="c">#    self._categories[key]</span>
+        <span class="c">#else:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            
+<div class="viewcode-block" id="FixMat.filter"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.filter">[docs]</a>    <span class="k">def</span> <span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Filters a fixmat by different aspects.</span>
+<span class="sd">        </span>
+<span class="sd">        This function is a device to filter the fixmat by certain logical </span>
+<span class="sd">        conditions. It takes as input a logical array (contains only True</span>
+<span class="sd">        or False for every fixation) and kicks out all fixations for which</span>
+<span class="sd">        the array says False. The logical array can conveniently be created</span>
+<span class="sd">        with numpy::</span>
+<span class="sd">        </span>
+<span class="sd">            &gt;&gt;&gt; print np.unique(fm.category)</span>
+<span class="sd">            np.array([2,9])</span>
+<span class="sd">            &gt;&gt;&gt; fm_filtered = fm[ fm.category == 9 ]</span>
+<span class="sd">            &gt;&gt;&gt; print np.unique(fm_filtered)</span>
+<span class="sd">            np.array([9])</span>
+<span class="sd">    </span>
+<span class="sd">        Parameters:</span>
+<span class="sd">            index : array</span>
+<span class="sd">                Array-like that contains True for every fixtation that</span>
+<span class="sd">                passes the filter; else contains False</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            fixmat : FixMat Instance</span>
+<span class="sd">        </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">FixMat</span><span class="p">(</span><span class="n">categories</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="p">,</span> <span class="n">fixmat</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">index</span><span class="p">)</span>
+            
+            </div>
+<div class="viewcode-block" id="FixMat.save"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.save">[docs]</a>    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves fixmat to path.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters:</span>
+<span class="sd">            path : string   </span>
+<span class="sd">                Absolute path of the file to save to.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">savefile</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="s">&#39;wb&#39;</span><span class="p">)</span>
+        <span class="n">cPickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span> <span class="bp">self</span><span class="p">,</span> <span class="n">savefile</span><span class="p">)</span>
+   </div>
+    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="FixMat.load"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.load">[docs]</a>    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load fixmat at path.</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters:</span>
+<span class="sd">            path : string</span>
+<span class="sd">                Absolute path of the file to load from.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cPickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s">&#39;r&#39;</span><span class="p">))</span>
+            </div>
+<div class="viewcode-block" id="FixMat.fieldnames"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.fieldnames">[docs]</a>    <span class="k">def</span> <span class="nf">fieldnames</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a list of data fields that are present in the fixmat.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span>
+            </div>
+<div class="viewcode-block" id="FixMat.parameters"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.parameters">[docs]</a>    <span class="k">def</span> <span class="nf">parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a list of parameters that are available. </span>
+<span class="sd">        </span>
+<span class="sd">        .. note::Parameters refer to things like &#39;image_size&#39;, &#39;pixels_per_degree&#39;, </span>
+<span class="sd">            i.e. values that are valid for the entire fixmat.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span>
+                            </div>
+<div class="viewcode-block" id="FixMat.by_field"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.by_field">[docs]</a>    <span class="k">def</span> <span class="nf">by_field</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns an iterator that iterates over unique values of field</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters:</span>
+<span class="sd">            field : string</span>
+<span class="sd">                Filters the fixmat for every unique value in field and yields </span>
+<span class="sd">                the filtered fixmat.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            fixmat : FixMat that is filtered according to one of the unique</span>
+<span class="sd">                values in &#39;field&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]):</span>
+            <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">==</span> <span class="n">value</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="FixMat.by_cat"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.by_cat">[docs]</a>    <span class="k">def</span> <span class="nf">by_cat</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Iterates over categories and returns a filtered fixmat. </span>
+<span class="sd">        </span>
+<span class="sd">        If a categories object is attached, the images object for the given </span>
+<span class="sd">        category is returned as well (else None is returned).</span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            (fixmat, categories) : A tuple that contains first the filtered</span>
+<span class="sd">                fixmat (has only one category) and second the associated </span>
+<span class="sd">                categories object (if it is available, None otherwise)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">):</span>
+            <span class="n">cat_fm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="n">value</span><span class="p">)</span> 
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="p">(</span><span class="n">cat_fm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="p">[</span><span class="n">value</span><span class="p">])</span> 
+            <span class="k">else</span><span class="p">:</span> 
+                <span class="k">yield</span> <span class="p">(</span><span class="n">cat_fm</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> 
+             </div>
+<div class="viewcode-block" id="FixMat.by_filenumber"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.by_filenumber">[docs]</a>    <span class="k">def</span> <span class="nf">by_filenumber</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Iterates over categories and returns a filtered fixmat. </span>
+<span class="sd">        </span>
+<span class="sd">        If a categories object is attached, the images object for the given </span>
+<span class="sd">        category is returned as well (else None is returned).</span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            (fixmat, categories) : A tuple that contains first the filtered</span>
+<span class="sd">                fixmat (has only one category) and second the associated </span>
+<span class="sd">                categories object (if it is available, None otherwise)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filenumber</span><span class="p">):</span>
+            <span class="n">file_fm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="n">value</span><span class="p">)</span> 
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="p">(</span><span class="n">file_fm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">value</span><span class="p">])</span> 
+            <span class="k">else</span><span class="p">:</span> 
+                <span class="k">yield</span> <span class="p">(</span><span class="n">file_fm</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>        
+    </div>
+<div class="viewcode-block" id="FixMat.add_field"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.add_field">[docs]</a>    <span class="k">def</span> <span class="nf">add_field</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add a new field to the fixmat.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            name : string</span>
+<span class="sd">                Name of the new field</span>
+<span class="sd">            data : list</span>
+<span class="sd">                Data for the new field, must be same length as all other fields.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s">&#39;Cannot add field </span><span class="si">%s</span><span class="s">. A field of the same name already exists.&#39;</span>
+                <span class="o">%</span><span class="n">name</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_fix</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s">&#39;Can not add field </span><span class="si">%s</span><span class="s">, data does not have correct length&#39;</span> 
+                <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">)))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span>
+    </div>
+<div class="viewcode-block" id="FixMat.rm_field"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.rm_field">[docs]</a>    <span class="k">def</span> <span class="nf">rm_field</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Remove a field from the fixmat.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            name : string</span>
+<span class="sd">                Name of the field to be removed</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s">&#39;Cannot delete field </span><span class="si">%s</span><span class="s">. No such field exists&#39;</span><span class="o">%</span><span class="n">name</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+</div>
+<div class="viewcode-block" id="FixMat.join"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.join">[docs]</a>    <span class="k">def</span> <span class="nf">join</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fm_new</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adds content of a new fixmat to this fixmat.</span>
+<span class="sd">        </span>
+<span class="sd">        If the two fixmats have different fields the minimal subset of both </span>
+<span class="sd">        are present after the join. Parameters of the fixmats must be the </span>
+<span class="sd">        same.</span>
+<span class="sd"> </span>
+<span class="sd">        Parameters</span>
+<span class="sd">        fm_new : Instance of Fixmat</span>
+<span class="sd">            This fixmat is added to the current one. Can only contain data</span>
+<span class="sd">            from one subject.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># Check if new fixmat has only data from one subject</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">fm_new</span><span class="o">.</span><span class="n">SUBJECTINDEX</span><span class="p">))</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sd">&quot;&quot;&quot;Can only join fixmats if new fixmat has data from only </span>
+<span class="sd">                one subject&quot;&quot;&quot;</span><span class="p">))</span>
+        
+        <span class="c"># Check if parameters are equal</span>
+        <span class="k">for</span> <span class="p">((</span><span class="n">n_cu</span><span class="p">,</span> <span class="n">v_cu</span><span class="p">),</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">v_all</span><span class="p">))</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">fm_new</span><span class="o">.</span><span class="n">_parameters</span><span class="o">.</span><span class="n">iteritems</span><span class="p">(),</span>
+                                                <span class="bp">self</span><span class="o">.</span><span class="n">_parameters</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">v_cu</span> <span class="o">==</span> <span class="n">v_all</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&quot;&quot;&quot;Parameter </span><span class="si">%s</span><span class="s"> has value </span><span class="si">%s</span><span class="s"> in current and</span>
+<span class="s">                     value </span><span class="si">%s</span><span class="s"> in new fixmat&quot;&quot;&quot;</span> <span class="o">%</span><span class="p">(</span><span class="n">n_cu</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">v_all</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">v_cu</span><span class="p">))))</span>
+
+        <span class="c"># Check if same fields are present, if not only use minimal subset</span>
+        <span class="n">new_fields</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fm_new</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+                <span class="c"># field does not exist in f_current, del it from f_all</span>
+                <span class="nb">delattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c"># field exists, so keep it. afraid of just deleting it while</span>
+                <span class="c"># iterating over the list so reconstruct a new one</span>
+                <span class="n">new_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span> <span class="o">=</span> <span class="n">new_fields</span>
+        <span class="c"># Subjectindices must be unique, if indices in f_current are contained</span>
+        <span class="c"># in f_all set them to an arbitrary number</span>
+        <span class="k">if</span> <span class="n">fm_new</span><span class="o">.</span><span class="n">SUBJECTINDEX</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">SUBJECTINDEX</span><span class="p">:</span>
+            <span class="n">fm_new</span><span class="o">.</span><span class="n">SUBJECTINDEX</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">fm_new</span><span class="o">.</span><span class="n">SUBJECTINDEX</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">*</span> \
+            <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SUBJECTINDEX</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="c"># Concatenate fields</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">],</span> 
+                <span class="n">fm_new</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]))</span>
+
+        <span class="c"># Update _num_fix</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_num_fix</span> <span class="o">+=</span> <span class="n">fm_new</span><span class="o">.</span><span class="n">_num_fix</span> 
+
+        </div>
+<div class="viewcode-block" id="FixMat.add_feature_values"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.add_feature_values">[docs]</a>    <span class="k">def</span> <span class="nf">add_feature_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">features</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adds feature values of feature &#39;feature&#39; to all fixations in </span>
+<span class="sd">        the calling fixmat.</span>
+<span class="sd">        </span>
+<span class="sd">        For fixations out of the image boundaries, NaNs are returned.</span>
+<span class="sd">        The function generates a new attribute field named with the</span>
+<span class="sd">        string in features that contains an np.array listing feature</span>
+<span class="sd">        values for every fixation in the fixmat.</span>
+<span class="sd">        </span>
+<span class="sd">        .. note:: The calling fixmat must have been constructed with an </span>
+<span class="sd">        stimuli.Categories object</span>
+<span class="sd">        </span>
+<span class="sd">        Parameters:</span>
+<span class="sd">            features : string</span>
+<span class="sd">                list of feature names for which feature values are extracted.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="sd">&#39;&#39;&#39;&quot;%s&quot; does not exist as a fieldname and the</span>
+<span class="sd">            fixmat does not have a Categories object (no features </span>
+<span class="sd">            available. The fixmat has these fields: %s&#39;&#39;&#39;</span> \
+            <span class="o">%</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">)))</span> 
+        <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">features</span><span class="p">:</span>
+            <span class="c"># initialize new field with NaNs</span>
+            <span class="n">feat_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)])</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span> 
+            <span class="k">for</span> <span class="p">(</span><span class="n">cat_mat</span><span class="p">,</span> <span class="n">imgs</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">by_cat</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">cat_mat</span><span class="o">.</span><span class="n">filenumber</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">):</span>
+                    <span class="n">fmap</span> <span class="o">=</span> <span class="n">imgs</span><span class="p">[</span><span class="n">img</span><span class="p">][</span><span class="n">feature</span><span class="p">]</span>
+                    <span class="n">on_image</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">on_image</span> <span class="o">=</span> <span class="n">on_image</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="n">idx</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="n">imgs</span><span class="o">.</span><span class="n">category</span><span class="p">)</span> <span class="o">&amp;</span> \
+                          <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="n">img</span><span class="p">)</span> <span class="o">&amp;</span> \
+                          <span class="p">(</span><span class="n">on_image</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s">&#39;bool&#39;</span><span class="p">))</span>
+                    <span class="n">feat_vals</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">fmap</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s">&#39;int&#39;</span><span class="p">),</span> 
+                        <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s">&#39;int&#39;</span><span class="p">)]</span>
+            <span class="c"># setattr(self, feature, feat_vals)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">add_field</span><span class="p">(</span><span class="n">feature</span><span class="p">,</span> <span class="n">feat_vals</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="FixMat.make_reg_data"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixMat.make_reg_data">[docs]</a>    <span class="k">def</span> <span class="nf">make_reg_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">feature_list</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">all_controls</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>    
+        <span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">        Generates two M x N matrices with M feature values at fixations for </span>
+<span class="sd">        N features. Controls are a random sample out of all non-fixated regions </span>
+<span class="sd">        of an image or fixations of the same subject group on a randomly chosen </span>
+<span class="sd">        image. Fixations are pooled over all subjects in the calling fixmat.</span>
+<span class="sd">       </span>
+<span class="sd">        Parameters : </span>
+<span class="sd">            all_controls : bool</span>
+<span class="sd">                if True, all non-fixated points on a feature map are takes as</span>
+<span class="sd">                control values. If False, controls are fixations from the same</span>
+<span class="sd">                subjects but on one other randomly chosen image of the same</span>
+<span class="sd">                category</span>
+<span class="sd">            feature_list : list of strings</span>
+<span class="sd">                contains names of all features that are used to generate</span>
+<span class="sd">                the feature value matrix (--&gt; number of dimensions in the </span>
+<span class="sd">                model). </span>
+<span class="sd">                ...note: this list has to be sorted !</span>
+
+<span class="sd">        Returns : </span>
+<span class="sd">            N x M matrix of N control feature values per feature (M).</span>
+<span class="sd">            Rows = Feature number /type</span>
+<span class="sd">            Columns = Feature values</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">pixels_per_degree</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="n">warn</span><span class="p">(</span><span class="s">&#39;There are fixations within 2deg visual &#39;</span> <span class="o">+</span>
+            <span class="s">&#39;angle of the image border&#39;</span><span class="p">)</span>
+        <span class="n">on_image</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">on_image</span> <span class="o">=</span> <span class="n">on_image</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">assert</span> <span class="n">on_image</span><span class="o">.</span><span class="n">all</span><span class="p">(),</span> <span class="s">&quot;All Fixations need to be on the image&quot;</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filenumber</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">),</span> <span class="s">&quot;Fixmat has to have more than one filenumber&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">feature_list</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">feature_list</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_categories</span><span class="o">.</span><span class="n">_features</span><span class="p">)</span>
+        <span class="n">all_act</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">feature_list</span><span class="p">),</span> <span class="mi">1</span><span class="p">))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="n">all_ctrls</span> <span class="o">=</span> <span class="n">all_act</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                            
+        <span class="k">for</span> <span class="p">(</span><span class="n">cfm</span><span class="p">,</span> <span class="n">imgs</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">by_cat</span><span class="p">():</span>
+            <span class="c"># make a list of all filenumbers in this category and then </span>
+            <span class="c"># choose one random filenumber without replacement</span>
+            <span class="n">imfiles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">imgs</span><span class="o">.</span><span class="n">images</span><span class="p">())</span> <span class="c"># array makes a copy of the list</span>
+            <span class="n">ctrl_imgs</span> <span class="o">=</span> <span class="n">imfiles</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">ctrl_imgs</span><span class="p">)</span>
+            <span class="k">while</span> <span class="p">(</span><span class="n">imfiles</span> <span class="o">==</span> <span class="n">ctrl_imgs</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">ctrl_imgs</span><span class="p">)</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">imidx</span><span class="p">,</span> <span class="n">img</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">imfiles</span><span class="p">):</span>
+                <span class="n">xact</span> <span class="o">=</span> <span class="n">cfm</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="n">cfm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="n">img</span><span class="p">]</span>
+                <span class="n">yact</span> <span class="o">=</span> <span class="n">cfm</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">cfm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="n">img</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">all_controls</span><span class="p">:</span>
+                <span class="c"># take a sample the same length as the actuals out of every </span>
+                <span class="c"># non-fixated point in the feature map</span>
+                    <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">image_size</span><span class="p">)</span>
+                    <span class="n">idx</span><span class="p">[</span><span class="n">cfm</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">cfm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="n">img</span><span class="p">],</span> 
+                        <span class="n">cfm</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="n">cfm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="n">img</span><span class="p">]]</span> <span class="o">=</span> <span class="mi">0</span>
+                    <span class="n">yctrl</span><span class="p">,</span> <span class="n">xctrl</span> <span class="o">=</span> <span class="n">idx</span><span class="o">.</span><span class="n">nonzero</span><span class="p">()</span>
+                    <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">yctrl</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">xact</span><span class="p">))</span>
+                    <span class="n">yctrl</span> <span class="o">=</span> <span class="n">yctrl</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                    <span class="n">xctrl</span> <span class="o">=</span> <span class="n">xctrl</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                    <span class="k">del</span> <span class="n">idx</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">xctrl</span> <span class="o">=</span> <span class="n">cfm</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="n">cfm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="n">ctrl_imgs</span><span class="p">[</span><span class="n">imidx</span><span class="p">]]</span>
+                    <span class="n">yctrl</span> <span class="o">=</span> <span class="n">cfm</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">cfm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="n">ctrl_imgs</span><span class="p">[</span><span class="n">imidx</span><span class="p">]]</span>
+                <span class="c"># initialize arrays for this filenumber</span>
+                <span class="n">actuals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">xact</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+                <span class="n">controls</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">xctrl</span><span class="p">)))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>                
+                
+                <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">feature_list</span><span class="p">:</span>
+                    <span class="c"># get the feature map</span>
+                    <span class="n">fmap</span> <span class="o">=</span> <span class="n">imgs</span><span class="p">[</span><span class="n">img</span><span class="p">][</span><span class="n">feature</span><span class="p">]</span>
+                    <span class="n">actuals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">actuals</span><span class="p">,</span> <span class="n">fmap</span><span class="p">[</span><span class="n">yact</span><span class="p">,</span> <span class="n">xact</span><span class="p">]))</span>
+                    <span class="n">controls</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">controls</span><span class="p">,</span> <span class="n">fmap</span><span class="p">[</span><span class="n">yctrl</span><span class="p">,</span> <span class="n">xctrl</span><span class="p">]))</span>
+                <span class="n">all_act</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">all_act</span><span class="p">,</span> <span class="n">actuals</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="p">:]))</span>
+                <span class="n">all_ctrls</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">all_ctrls</span><span class="p">,</span> <span class="n">controls</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="p">:]))</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">all_act</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:],</span> <span class="n">all_ctrls</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:])</span> <span class="c"># first column was dummy </span>
+
+</div></div>
+<div class="viewcode-block" id="compute_fdm"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.compute_fdm">[docs]</a><span class="k">def</span> <span class="nf">compute_fdm</span><span class="p">(</span><span class="n">fixmat</span><span class="p">,</span> <span class="n">fwhm</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">scale_factor</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Computes a fixation density map for the calling fixmat. </span>
+<span class="sd">    </span>
+<span class="sd">    Creates a map the size of the image fixations were recorded on.  </span>
+<span class="sd">    Every pixel contains the frequency of fixations</span>
+<span class="sd">    for this image. The fixation map is smoothed by convolution with a</span>
+<span class="sd">    Gaussian kernel to approximate the area with highest processing</span>
+<span class="sd">    (usually 2 deg. visual angle).</span>
+
+<span class="sd">    Note: The function does not check whether the fixmat contains</span>
+<span class="sd">    fixations from different images as it might be desirable to compute</span>
+<span class="sd">    fdms over fixations from more than one image.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        fwhm :  float </span>
+<span class="sd">            the full width at half maximum of the Gaussian kernel used</span>
+<span class="sd">            for convolution of the fixation frequency map.</span>
+
+<span class="sd">        scale_factor : float</span>
+<span class="sd">            scale factor for the resulting fdm. Default is 1. Scale_factor</span>
+<span class="sd">            must be a float specifying the fraction of the current size.</span>
+<span class="sd">        </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        fdm  : numpy.array </span>
+<span class="sd">            a numpy.array of size fixmat.image_size containing</span>
+<span class="sd">            the fixation probability for every location on the image.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c"># image category must exist (&gt;-1) and image_size must be non-empty</span>
+    <span class="k">assert</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">fixmat</span><span class="o">.</span><span class="n">image_size</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="p">(</span><span class="n">fixmat</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span>
+        <span class="p">(</span><span class="n">fixmat</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)),</span> <span class="s">&#39;The image_size is either 0, or not 2D&#39;</span>
+    <span class="k">assert</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">pixels_per_degree</span><span class="p">,</span> <span class="s">&#39;Fixmat has to have a pixels_per_degree field&#39;</span>
+    <span class="c"># check whether fixmat contains fixations</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fixmat</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">NoFixations</span><span class="p">(</span><span class="s">&#39;There are no fixations in the fixmat.&#39;</span><span class="p">)</span>
+
+    <span class="k">assert</span> <span class="ow">not</span> <span class="n">scale_factor</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&quot;scale_factor has to &gt; 0&quot;</span>
+    <span class="c"># this specifies left edges of the histogram bins, i.e. fixations between</span>
+    <span class="c"># ]0 binedge[0]] are included. --&gt; fixations are ceiled</span>
+    <span class="n">e_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">scale_factor</span><span class="o">*</span><span class="n">fixmat</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">e_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">scale_factor</span><span class="o">*</span><span class="n">fixmat</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">zip</span><span class="p">((</span><span class="n">scale_factor</span><span class="o">*</span><span class="n">fixmat</span><span class="o">.</span><span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="n">scale_factor</span><span class="o">*</span><span class="n">fixmat</span><span class="o">.</span><span class="n">x</span><span class="p">)))</span>
+    <span class="p">(</span><span class="n">hist</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogramdd</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="p">(</span><span class="n">e_y</span><span class="p">,</span> <span class="n">e_x</span><span class="p">))</span>
+    <span class="n">kernel_sigma</span> <span class="o">=</span> <span class="n">fwhm</span> <span class="o">*</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">pixels_per_degree</span> <span class="o">*</span> <span class="n">scale_factor</span>
+    <span class="n">kernel_sigma</span> <span class="o">=</span> <span class="n">kernel_sigma</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span> <span class="o">**</span> <span class="o">.</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">fdm</span> <span class="o">=</span> <span class="n">gaussian_filter</span><span class="p">(</span><span class="n">hist</span><span class="p">,</span> <span class="n">kernel_sigma</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&#39;constant&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">fdm</span> <span class="o">/</span> <span class="n">fdm</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+</div>
+<span class="k">def</span> <span class="nf">relative_bias</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scale_factor</span> <span class="o">=</span> <span class="mi">1</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Computes the relative bias, i.e. the distribution of saccade angles </span>
+<span class="sd">    and amplitudes. </span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        fm : FixMat</span>
+<span class="sd">            The fixation data to use</span>
+<span class="sd">        center : 2D Point (Tuple)</span>
+<span class="sd">            Only saccades that are at most &#39;radius&#39; px. away from &#39;center&#39;</span>
+<span class="sd">            are considered for computing the distribution.</span>
+<span class="sd">        radius : double</span>
+<span class="sd">            Only saccades that are at most &#39;radius&#39; px. away from &#39;center&#39;</span>
+<span class="sd">            are considered for computing the distribution.</span>
+<span class="sd">        scale_factor : double</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        2D probability distribution of saccade angles and amplitudes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="s">&#39;fix&#39;</span> <span class="ow">in</span> <span class="n">fm</span><span class="o">.</span><span class="n">fieldnames</span><span class="p">(),</span> <span class="s">&quot;Can not work without fixation  numbers&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">center</span><span class="p">:</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">/</span><span class="mf">2.0</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="mf">2.0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">center</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">radius</span><span class="p">:</span>
+        <span class="n">radius</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="o">.</span><span class="mi">5</span>
+   
+    <span class="c"># Add two fields to our fixmat: distance and difference</span>
+    <span class="c"># calculate how far this fixation is from the center of interest,</span>
+    <span class="n">dist</span> <span class="o">=</span> <span class="p">((</span><span class="n">fm</span><span class="o">.</span><span class="n">x</span><span class="o">-</span><span class="n">x</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">y</span><span class="o">-</span><span class="n">y</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">**.</span><span class="mi">5</span>
+    <span class="c"># Now calculate the direction where the NEXT fixation goes to</span>
+    <span class="n">diff_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">fm</span><span class="o">.</span><span class="n">x</span>
+    <span class="n">diff_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">fm</span><span class="o">.</span><span class="n">y</span>
+    <span class="c"># We can not include those fixation pairs that are </span>
+    <span class="c"># a) not on the same stimulus and</span>
+    <span class="c"># b) where fixations are not consecutive</span>
+    <span class="n">excl</span> <span class="o">=</span> <span class="n">fm</span><span class="o">.</span><span class="n">fix</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">fix</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span>
+    <span class="c"># Add to fixmat</span>
+    <span class="n">fm</span><span class="o">.</span><span class="n">add_field</span><span class="p">(</span><span class="s">&#39;dist&#39;</span><span class="p">,</span> <span class="n">dist</span><span class="p">)</span>
+    <span class="n">fm</span><span class="o">.</span><span class="n">add_field</span><span class="p">(</span><span class="s">&#39;diff_x&#39;</span><span class="p">,</span> <span class="n">diff_x</span><span class="p">)</span>
+    <span class="n">fm</span><span class="o">.</span><span class="n">add_field</span><span class="p">(</span><span class="s">&#39;diff_y&#39;</span><span class="p">,</span> <span class="n">diff_y</span><span class="p">)</span>
+    
+    <span class="c"># Find all fixations that are within radius around (y,x)</span>
+    <span class="n">f_filt</span> <span class="o">=</span> <span class="n">fm</span><span class="p">[</span> <span class="p">(</span><span class="o">~</span><span class="n">excl</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">dist</span> <span class="o">&lt;=</span> <span class="n">radius</span><span class="p">)]</span>
+
+    <span class="c"># Make a histogram of diff values</span>
+    <span class="c"># this specifies left edges of the histogram bins, i.e. fixations between</span>
+    <span class="c"># ]0 binedge[0]] are included. --&gt; fixations are ceiled</span>
+    <span class="n">ylim</span> <span class="o">=</span>  <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">scale_factor</span> <span class="o">*</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">xlim</span> <span class="o">=</span>  <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">scale_factor</span> <span class="o">*</span> <span class="n">fm</span><span class="o">.</span><span class="n">image_size</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">e_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="n">ylim</span><span class="p">,</span> <span class="n">ylim</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">e_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="n">xlim</span><span class="p">,</span> <span class="n">xlim</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">zip</span><span class="p">((</span><span class="n">scale_factor</span> <span class="o">*</span> <span class="n">f_filt</span><span class="o">.</span><span class="n">diff_y</span><span class="p">),</span>
+                             <span class="p">(</span><span class="n">scale_factor</span><span class="o">*</span><span class="n">f_filt</span><span class="o">.</span><span class="n">diff_x</span><span class="p">)))</span>
+    <span class="p">(</span><span class="n">hist</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogramdd</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="p">(</span><span class="n">e_y</span><span class="p">,</span> <span class="n">e_x</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">hist</span>
+     
+<span class="k">class</span> <span class="nc">NoFixations</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Signals that a FixMat contains no Fixations </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span>
+    
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">msg</span><span class="p">)</span>
+        
+                                             
+<div class="viewcode-block" id="DirectoryFixmatFactory"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.DirectoryFixmatFactory">[docs]</a><span class="k">def</span> <span class="nf">DirectoryFixmatFactory</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">categories</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">glob_str</span> <span class="o">=</span> <span class="s">&#39;*.mat&#39;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Concatenates all fixmats in dir and returns the resulting single</span>
+<span class="sd">    fixmat.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        directory : string</span>
+<span class="sd">            Path from which the fixmats should be loaded</span>
+<span class="sd">        categories : instance of stimuli.Categories, optional</span>
+<span class="sd">            If given, the resulting fixmat provides direct access</span>
+<span class="sd">            to the data in the categories object.</span>
+<span class="sd">        glob_str : string</span>
+<span class="sd">            A regular expression that defines which mat files are picked up</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        f_all : instance of FixMat</span>
+<span class="sd">            Contains all fixmats that were found in given directory</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">files</span> <span class="o">=</span> <span class="n">glob</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span><span class="n">glob_str</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;Could not find any fixmats in &quot;</span> <span class="o">+</span> 
+            <span class="n">join</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">glob_str</span><span class="p">))</span>
+    <span class="n">f_all</span> <span class="o">=</span> <span class="n">FixmatFactory</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">files</span><span class="o">.</span><span class="n">pop</span><span class="p">()),</span> <span class="n">categories</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+        <span class="n">f_current</span> <span class="o">=</span> <span class="n">FixmatFactory</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">fname</span><span class="p">),</span> <span class="n">categories</span><span class="p">)</span>
+        <span class="n">f_all</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">f_current</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">f_all</span>
+
+</div>
+<div class="viewcode-block" id="FixmatFactory"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.FixmatFactory">[docs]</a><span class="k">def</span> <span class="nf">FixmatFactory</span><span class="p">(</span><span class="n">fixmatfile</span><span class="p">,</span> <span class="n">categories</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Loads a single fixmat (fixmatfile).</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        fixmatfile : string</span>
+<span class="sd">            The matlab fixmat that should be loaded.</span>
+<span class="sd">        categories : instance of stimuli.Categories, optional</span>
+<span class="sd">            Links data in categories to data in fixmat.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">loadmat</span><span class="p">(</span><span class="n">fixmatfile</span><span class="p">,</span> <span class="n">struct_as_record</span> <span class="o">=</span> <span class="bp">False</span><span class="p">)[</span><span class="s">&#39;fixmat&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">num_fix</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">size</span>
+    
+    <span class="c"># Get a list with fieldnames and a list with parameters</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">parameters</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">_fieldnames</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">__getattribute__</span><span class="p">(</span><span class="n">field</span><span class="p">)</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="n">num_fix</span><span class="p">:</span>
+            <span class="n">fields</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">__getattribute__</span><span class="p">(</span><span class="n">field</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>            
+            <span class="n">parameters</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">__getattribute__</span><span class="p">(</span><span class="n">field</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parameters</span><span class="p">[</span><span class="n">field</span><span class="p">])</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">parameters</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="n">field</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    
+    <span class="c"># Generate FixMat</span>
+    <span class="n">fixmat</span> <span class="o">=</span> <span class="n">FixMat</span><span class="p">(</span><span class="n">categories</span> <span class="o">=</span> <span class="n">categories</span><span class="p">)</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">_fields</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">fields</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+        <span class="n">fixmat</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,)</span> 
+
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">_parameters</span> <span class="o">=</span> <span class="n">parameters</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">_subjects</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">parameters</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+        <span class="n">fixmat</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">_num_fix</span> <span class="o">=</span> <span class="n">num_fix</span>
+    <span class="k">return</span> <span class="n">fixmat</span>
+    </div>
+<div class="viewcode-block" id="TestFixmatFactory"><a class="viewcode-back" href="../../fixmat.html#ocupy.fixmat.TestFixmatFactory">[docs]</a><span class="k">def</span> <span class="nf">TestFixmatFactory</span><span class="p">(</span><span class="n">points</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">categories</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span> 
+                <span class="n">filenumbers</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">subjectindices</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">params</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span>
+                <span class="n">categories_obj</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">    Returns a fixmat where the content is known. </span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        points : list, optional</span>
+<span class="sd">            This list contains coordinates of fixations. I.e. list[0] contains x </span>
+<span class="sd">            and list[1] contains y. If omitted, the line that connects (0,0) </span>
+<span class="sd">            and (922,922) is used.</span>
+<span class="sd">        category : list, default = [1]</span>
+<span class="sd">            Category numbers to be used for the fixations. All fixations are</span>
+<span class="sd">            repeated for every category.</span>
+<span class="sd">        subjectindices : list, default = [1]</span>
+<span class="sd">            Subjectindices to be used for the fixations. Every subjectindex will show</span>
+<span class="sd">            up for every category in the test fixmat. </span>
+<span class="sd">        params : dictionary, optional</span>
+<span class="sd">            A list of parameters that is set for the resulting fixmat. Defaults </span>
+<span class="sd">            are &#39;image_size&#39;:[922,1272] and &#39;pxels_per_degree&#39;:36</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">default_parameters</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;image_size&#39;</span><span class="p">:[</span><span class="mi">922</span><span class="p">,</span> <span class="mi">1272</span><span class="p">],</span> <span class="s">&#39;pixels_per_degree&#39;</span><span class="p">:</span><span class="mi">36</span><span class="p">}</span>
+    <span class="n">fixmat</span> <span class="o">=</span> <span class="n">FixMat</span><span class="p">(</span><span class="n">categories</span><span class="o">=</span><span class="n">categories_obj</span><span class="p">)</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="p">[]</span> 
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">SUBJECTINDEX</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">category</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">fix</span> <span class="o">=</span> <span class="p">[]</span> 
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">params</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">default_parameters</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">points</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="p">[[</span> <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">default_parameters</span><span class="p">[</span><span class="s">&#39;image_size&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">])],</span>
+                  <span class="p">[</span> <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">default_parameters</span><span class="p">[</span><span class="s">&#39;image_size&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">])]]</span>
+    <span class="k">for</span> <span class="n">cat</span> <span class="ow">in</span> <span class="n">categories</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">subjectindices</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="n">filenumbers</span><span class="p">:</span>
+                <span class="n">fixmat</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">fixmat</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">points</span><span class="p">[</span><span class="mi">0</span><span class="p">])))</span>
+                <span class="n">fixmat</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">fixmat</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">points</span><span class="p">[</span><span class="mi">1</span><span class="p">])))</span>
+                <span class="n">fixmat</span><span class="o">.</span><span class="n">SUBJECTINDEX</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">fixmat</span><span class="o">.</span><span class="n">SUBJECTINDEX</span><span class="p">,</span> <span class="n">sub</span> <span class="o">*</span>
+                    <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[</span><span class="mi">0</span><span class="p">]))))</span>
+                <span class="n">fixmat</span><span class="o">.</span><span class="n">category</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">fixmat</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="n">cat</span> <span class="o">*</span>
+                    <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[</span><span class="mi">0</span><span class="p">]))))</span>
+                <span class="n">fixmat</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">fixmat</span><span class="o">.</span><span class="n">filenumber</span><span class="p">,</span> <span class="n">img</span> <span class="o">*</span>
+                    <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[</span><span class="mi">0</span><span class="p">]))))</span>
+                <span class="n">fixmat</span><span class="o">.</span><span class="n">fix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="n">fixmat</span><span class="o">.</span><span class="n">fix</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[</span><span class="mi">0</span><span class="p">]))))</span>
+ 
+
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">_fields</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;x&#39;</span><span class="p">,</span> <span class="s">&#39;y&#39;</span><span class="p">,</span> <span class="s">&#39;SUBJECTINDEX&#39;</span><span class="p">,</span> <span class="s">&#39;filenumber&#39;</span><span class="p">,</span> <span class="s">&#39;category&#39;</span><span class="p">,</span> <span class="s">&#39;fix&#39;</span><span class="p">]</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">_parameters</span> <span class="o">=</span> <span class="n">default_parameters</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="n">default_parameters</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+        <span class="n">fixmat</span><span class="o">.</span><span class="n">__dict__</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+    <span class="n">fixmat</span><span class="o">.</span><span class="n">_num_fix</span>  <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">fixmat</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">fixmat</span>
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../index.html">
+              <img class="logo" src="../../_static/logo.png" alt="Logo"/>
+            </a></p>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">ocupy v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, WhiteMatter Labs GmbH.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
