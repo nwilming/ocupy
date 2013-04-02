@@ -1,0 +1,235 @@
+DataMat
+=======
+
+.. module:: ocupy.datamat
+
+This module contains a data structure, the datamat, that allows convenient analysis of 
+event based data. Event-based consits of discrete events that have other information
+associated with it. For example in eye-tracking analysis (where ocupy comes from),
+fixations might be considered events. Each fixation has associated information such as
+the duration of the fixation, which observer made the fixation, where it was etc.
+
+A datamat groups many events into one structure and provides an easy interface
+to access and filter the information.
+
+This document describes the most important properties of datamats in three steps. 
+First, it explains how datamats can be created from existing data, second it shows 
+some typical examples of how the datamat can be used and third it shows how a fixation 
+density map can be computed.
+ 
+
+
+Generating a datamat
+-------------------
+.. Note::  Currently datamats can not be created 
+   from raw EDF files by just using python. This means, you have to use
+   matlab and edfread to convert the raw data into a matlab datamat. Sorry. 
+
+There are several ways to create a datamat:
+    1. Convert a dictionary of key:ndarray pairs with the VectorFactory
+    2. Use the AccumulatorFactory to add key:value dictionaries to create a datamat.
+    3. The DatamatAccumulator collects datamats and joins them speedily into a datamat.
+    4. Load a single matlab datamat file from disk (datamat.FixmatFactory)
+    5. Concatenate all datamats in a directory (datamat.DirectoryFixmatFactory
+
+The VectorFactory
+^^^^^^^^^^^^^^^^^
+
+The VectorFactory creates a datamat from a dictionary that contains numpy.ndarrays
+as fields.
+
+        >>> from ocupy.datamat import VectorFactory
+        >>> fields = {'duration':[145,323,243,123,231], 'image':[1,2,3,4,5]}
+        >>> parameters = {'num_images':5}
+        >>> dm = VectorFactory(fields, parameters)
+
+The AccumulatorFactory
+^^^^^^^^^^^^^^^^^^^^^^
+
+The accumulator factory accumulates single events and concatenates these into a 
+datamat. Events are represented by dictionaries that whose keys will be the
+fieldnames and the values are stored in the fields of the datamat. Missing
+information is encoded as np.nan.
+
+        >>> from ocupy.datamat import AccumulatorFactory
+        >>> acc = AccumulatorFactory()
+        >>> for _ in range(100):
+                fields = {'duration':2, 'image':}
+                acc.update(fields)
+        >>> acc.get_dm(params = {'num_images':5}) # Returns the datamat
+        
+
+The DatamatAccumulator
+^^^^^^^^^^^^^^^^^^^^^^
+
+The datamat accumulator is very similar to the AccumulatorFactory but takes
+datamats as arguments. The main difference to the datamata.join() function
+that this factory allocates memory for all joins before it starts joining.
+This is much more efficient since it avoids unnecessary copying of memory.
+
+ 
+Using the FixmatFactory
+^^^^^^^^^^^^^^^^^^^^^^^
+
+This factory loads a matlab struct and converts it into a datamat. It is located
+in the fixmat module.
+
+The matlab struct needs to be contain fields with the same length for this to work.
+The var_name argument specifies which variable to load from the mat file.
+
+	>>> from ocupy.fixmat import FixmatFactory
+	>>> fm = FixmatFactory('../ocupy/tests/datamat_demo.mat', var_name = 'fixmat')
+
+.. autofunction:: FixmatFactory
+
+Using the DirectoryFixmatFactory
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The DirectoryFixmatFactory loads the specified variabel from all \*.mat files 
+in a directory (assuming they're datamats) and concatenates these into on big datamat.
+
+	>>> from ocupy.fixmat import DirectoryFixmatFactory
+	>>> fm = FixmatFactory('demo/', var_name='fixmat')
+
+You can also use globbing to select which files you want:
+        
+>>> fm = FixmatFactory('demo/', 'fix*.mat')
+
+.. autofunction:: DirectoryFixmatFactory
+
+
+Working with datamats
+--------------------
+
+Let's go through the process step-by-step with a demo datamat that is placed in 
+*ocupy/tests/fixmat_demo.mat*::
+
+	>>> from ocupy import fixmat 
+	>>> fm = fixmat.FixmatFactory('../ocupy/tests/fixmat_demo.mat')
+	>>> print fm
+	Fixmat with 2092 fixations and the following data fields:
+	          Field Name |     Length    |    Type    |        Values        
+	---------------------+---------------+------------+----------------
+	            category |      2092     |   int32    |        [7 8]         
+	                 end |      2092     |   int32    |         Many         
+	                 fix |      2092     |   uint8    |         Many         
+	        SUBJECTINDEX |      2092     |   uint8    |         [36]         
+	               start |      2092     |   int32    |         Many         
+	            on_image |      2092     |   uint8    |        [0 1]         
+	                   y |      2092     |  float32   |         Many         
+	                   x |      2092     |  float32   |         Many         
+	          filenumber |      2092     |   uint16   |         Many         
+	           condition |      2092     |   uint8    |         [1]          
+	---------------------+---------------+------------+----------------
+	      Parameter Name | Value               
+	---------------------+---------------------------------------------
+	          image_size | [960, 1280] 
+	   pixels_per_degree | 45 
+
+This loads the datamat and prints a pretty table summarizing the contents of the
+datamat. Please notice the distinction between *parameters* and *fields*. Both
+can be accessed by using the dot notation::
+
+	>>> fm.x[1:10]
+	array([  945.12036133,   582.62030029,   559.28320312,   932.50823975,
+         965.1854248 ,   925.03417969,  1216.84509277,   810.5010376 ,
+         525.40301514], dtype=float32)
+	>>> fm.image_size
+	[960, 1280]
+ 
+The next example shows how you would compute an FDM of the entire datamat
+(a.k.a. the spatial bias). 
+
+.. plot::
+	:include-source:
+	
+	import numpy as np
+	from ocupy import fixmat
+	import pylab as plot
+	fm = fixmat.FixmatFactory('../ocupy/tests/datamat_demo.mat')
+	fdm = fixmat.compute_fdm(fm,scale_factor=0.25)
+	plot.imshow(fdm)
+	plot.show()
+	
+Most often only a subset of the data is of interest. The datamat can be filtered by 
+using square brackets:
+
+	>>> fm = fm[fm.category == 7]
+	>>> print fm
+	Fixmat with 932 fixations and the following data fields:
+	          Field Name |     Length    |    Type    |        Values        
+	---------------------+---------------+------------+----------------
+	            category |      932      |   int32    |         [7]          
+	                 end |      932      |   int32    |         Many         
+	                 fix |      932      |   uint8    |         Many         
+	        SUBJECTINDEX |      932      |   uint8    |         [36]         
+	               start |      932      |   int32    |         Many         
+	            on_image |      932      |   uint8    |        [0 1]         
+	                   y |      932      |  float32   |         Many         
+	                   x |      932      |  float32   |         Many         
+	          filenumber |      932      |   uint16   |         Many         
+	           condition |      932      |   uint8    |         [1]          
+	---------------------+---------------+------------+----------------
+	      Parameter Name | Value               
+	---------------------+---------------------------------------------
+	          image_size | [960, 1280] 
+	   pixels_per_degree | 45 
+
+
+How does this work? The expression in the brackets is evaluated for every entry in
+the *fm.category* field. This results in a vector of booleans that has the same size
+as the *fm.category* field. Using the square brackets applies this logical index to all
+fields of the datamat. Several logical expressions can be combined with logical operators.
+In contrast to matlab the *logical* operators have stronger binding than the *comparison* 
+operators. Thus, *fm.category == 1 & fm.SUBJECTINDEX == 2* will produce an error because
+python will try to bind *1 & fm.SUBJECTINDEX*. To filter correctly, you have to use 
+parenthesis (see next example).
+
+.. plot::
+	:include-source:
+	
+	import numpy as np
+	from ocupy import fixmat
+	import pylab as plot
+	fm = fixmat.FixmatFactory('../ocupy/test/datamat_demo.mat')
+	fm = fm[(fm.filenumber == 1) & (fm.category == 7)]
+	fdm = fixmat.compute_fdm(fm,scale_factor=0.25)
+	plot.imshow(fdm)
+	plot.show()
+
+In matlab we would traditionally use for loops over all unique values of a field
+to iterate over the field. In python this is easier, we can simply use the :func:`by_field`
+method::
+	
+	fm = TestFixmatFactory(categories = [1, 2, 3], 
+                filenumbers = [1, 2, 3], subjectindices = [1, 2, 3])
+	for cat_mat in fm.by_field('category'):
+            for img_mat in cat_mat.by_field('filenumber'):
+                    # The img_mat now contains all fixation data for one image
+                    # in one cagegory
+                    pass
+                            
+There are some other usefull functions (:func:`add_field`, :func:`join`, :func:`parameters` and
+:func:`fieldnames`). See the following reference section for more details.
+
+
+.. autoclass:: DataMat
+    :members:
+
+Computing a fixation density map
+---------------------------------
+
+
+.. plot::
+   	:include-source:
+
+	import numpy as np
+	from ocupy import fixmat
+	import pylab as plot
+	points = np.random.random((2,100))*500
+	fm = fixmat.TestFixmatFactory(points = points, params = {'image_size' : [500,500]})
+	fdm = fixmat.compute_fdm(fm)
+	plot.imshow(fdm)
+	plot.show()
+.. autofunction:: compute_fdm
+

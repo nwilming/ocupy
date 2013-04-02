@@ -1,0 +1,349 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>DataMat &mdash; res.analysis 0.01 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.01',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="res.analysis 0.01 documentation" href="index.html" />
+    <link rel="next" title="FixMat" href="fixmat.html" />
+    <link rel="prev" title="Welcome to ocupy’s documentation!" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="fixmat.html" title="FixMat"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to ocupy’s documentation!"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">res.analysis 0.01 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="module-ocupy.datamat">
+<span id="datamat"></span><h1>DataMat<a class="headerlink" href="#module-ocupy.datamat" title="Permalink to this headline">¶</a></h1>
+<p>This module contains a data structure, the datamat, that allows convenient analysis of
+event based data. Event-based consits of discrete events that have other information
+associated with it. For example in eye-tracking analysis (where ocupy comes from),
+fixations might be considered events. Each fixation has associated information such as
+the duration of the fixation, which observer made the fixation, where it was etc.</p>
+<p>A datamat groups many events into one structure and provides an easy interface
+to access and filter the information.</p>
+<p>This document describes the most important properties of datamats in three steps.
+First, it explains how datamats can be created from existing data, second it shows
+some typical examples of how the datamat can be used and third it shows how a fixation
+density map can be computed.</p>
+<div class="section" id="generating-a-datamat">
+<h2>Generating a datamat<a class="headerlink" href="#generating-a-datamat" title="Permalink to this headline">¶</a></h2>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Currently datamats can not be created
+from raw EDF files by just using python. This means, you have to use
+matlab and edfread to convert the raw data into a matlab datamat. Sorry.</p>
+</div>
+<dl class="docutils">
+<dt>There are several ways to create a datamat:</dt>
+<dd><ol class="first last arabic simple">
+<li>Convert a dictionary of key:ndarray pairs with the VectorFactory</li>
+<li>Use the AccumulatorFactory to add key:value dictionaries to create a datamat.</li>
+<li>The DatamatAccumulator collects datamats and joins them speedily into a datamat.</li>
+<li>Load a single matlab datamat file from disk (datamat.FixmatFactory)</li>
+<li>Concatenate all datamats in a directory (datamat.DirectoryFixmatFactory</li>
+</ol>
+</dd>
+</dl>
+<div class="section" id="the-vectorfactory">
+<h3>The VectorFactory<a class="headerlink" href="#the-vectorfactory" title="Permalink to this headline">¶</a></h3>
+<p>The VectorFactory creates a datamat from a dictionary that contains numpy.ndarrays
+as fields.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">ocupy.datamat</span> <span class="kn">import</span> <span class="n">VectorFactory</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;duration&#39;</span><span class="p">:[</span><span class="mi">145</span><span class="p">,</span><span class="mi">323</span><span class="p">,</span><span class="mi">243</span><span class="p">,</span><span class="mi">123</span><span class="p">,</span><span class="mi">231</span><span class="p">],</span> <span class="s">&#39;image&#39;</span><span class="p">:[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">]}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;num_images&#39;</span><span class="p">:</span><span class="mi">5</span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dm</span> <span class="o">=</span> <span class="n">VectorFactory</span><span class="p">(</span><span class="n">fields</span><span class="p">,</span> <span class="n">parameters</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="the-accumulatorfactory">
+<h3>The AccumulatorFactory<a class="headerlink" href="#the-accumulatorfactory" title="Permalink to this headline">¶</a></h3>
+<p>The accumulator factory accumulates single events and concatenates these into a
+datamat. Events are represented by dictionaries that whose keys will be the
+fieldnames and the values are stored in the fields of the datamat. Missing
+information is encoded as np.nan.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">ocupy.datamat</span> <span class="kn">import</span> <span class="n">AccumulatorFactory</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">acc</span> <span class="o">=</span> <span class="n">AccumulatorFactory</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+<span class="go">        fields = {&#39;duration&#39;:2, &#39;image&#39;:}</span>
+<span class="go">        acc.update(fields)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">acc</span><span class="o">.</span><span class="n">get_dm</span><span class="p">(</span><span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;num_images&#39;</span><span class="p">:</span><span class="mi">5</span><span class="p">})</span> <span class="c"># Returns the datamat</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="the-datamataccumulator">
+<h3>The DatamatAccumulator<a class="headerlink" href="#the-datamataccumulator" title="Permalink to this headline">¶</a></h3>
+<p>The datamat accumulator is very similar to the AccumulatorFactory but takes
+datamats as arguments. The main difference to the datamata.join() function
+that this factory allocates memory for all joins before it starts joining.
+This is much more efficient since it avoids unnecessary copying of memory.</p>
+</div>
+<div class="section" id="using-the-fixmatfactory">
+<h3>Using the FixmatFactory<a class="headerlink" href="#using-the-fixmatfactory" title="Permalink to this headline">¶</a></h3>
+<p>This factory loads a matlab struct and converts it into a datamat. It is located
+in the fixmat module.</p>
+<p>The matlab struct needs to be contain fields with the same length for this to work.
+The var_name argument specifies which variable to load from the mat file.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">ocupy.fixmat</span> <span class="kn">import</span> <span class="n">FixmatFactory</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;../ocupy/tests/datamat_demo.mat&#39;</span><span class="p">,</span> <span class="n">var_name</span> <span class="o">=</span> <span class="s">&#39;fixmat&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="using-the-directoryfixmatfactory">
+<h3>Using the DirectoryFixmatFactory<a class="headerlink" href="#using-the-directoryfixmatfactory" title="Permalink to this headline">¶</a></h3>
+<p>The DirectoryFixmatFactory loads the specified variabel from all *.mat files
+in a directory (assuming they&#8217;re datamats) and concatenates these into on big datamat.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">ocupy.fixmat</span> <span class="kn">import</span> <span class="n">DirectoryFixmatFactory</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;demo/&#39;</span><span class="p">,</span> <span class="n">var_name</span><span class="o">=</span><span class="s">&#39;fixmat&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You can also use globbing to select which files you want:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;demo/&#39;</span><span class="p">,</span> <span class="s">&#39;fix*.mat&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="working-with-datamats">
+<h2>Working with datamats<a class="headerlink" href="#working-with-datamats" title="Permalink to this headline">¶</a></h2>
+<p>Let&#8217;s go through the process step-by-step with a demo datamat that is placed in
+<em>ocupy/tests/fixmat_demo.mat</em>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;../ocupy/tests/fixmat_demo.mat&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">fm</span>
+<span class="go">Fixmat with 2092 fixations and the following data fields:</span>
+<span class="go">          Field Name |     Length    |    Type    |        Values</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">            category |      2092     |   int32    |        [7 8]</span>
+<span class="go">                 end |      2092     |   int32    |         Many</span>
+<span class="go">                 fix |      2092     |   uint8    |         Many</span>
+<span class="go">        SUBJECTINDEX |      2092     |   uint8    |         [36]</span>
+<span class="go">               start |      2092     |   int32    |         Many</span>
+<span class="go">            on_image |      2092     |   uint8    |        [0 1]</span>
+<span class="go">                   y |      2092     |  float32   |         Many</span>
+<span class="go">                   x |      2092     |  float32   |         Many</span>
+<span class="go">          filenumber |      2092     |   uint16   |         Many</span>
+<span class="go">           condition |      2092     |   uint8    |         [1]</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">      Parameter Name | Value</span>
+<span class="go">---------------------+---------------------------------------------</span>
+<span class="go">          image_size | [960, 1280]</span>
+<span class="go">   pixels_per_degree | 45</span>
+</pre></div>
+</div>
+<p>This loads the datamat and prints a pretty table summarizing the contents of the
+datamat. Please notice the distinction between <em>parameters</em> and <em>fields</em>. Both
+can be accessed by using the dot notation:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">10</span><span class="p">]</span>
+<span class="go">array([  945.12036133,   582.62030029,   559.28320312,   932.50823975,</span>
+<span class="go"> 965.1854248 ,   925.03417969,  1216.84509277,   810.5010376 ,</span>
+<span class="go"> 525.40301514], dtype=float32)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span><span class="o">.</span><span class="n">image_size</span>
+<span class="go">[960, 1280]</span>
+</pre></div>
+</div>
+<p>The next example shows how you would compute an FDM of the entire datamat
+(a.k.a. the spatial bias).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="kn">import</span> <span class="nn">pylab</span> <span class="kn">as</span> <span class="nn">plot</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;../ocupy/tests/datamat_demo.mat&#39;</span><span class="p">)</span>
+<span class="n">fdm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">compute_fdm</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span><span class="n">scale_factor</span><span class="o">=</span><span class="mf">0.25</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">fdm</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>(<a class="reference external" href=".//datamat-1.py">Source code</a>)</p>
+<p>Most often only a subset of the data is of interest. The datamat can be filtered by
+using square brackets:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">fm</span><span class="p">[</span><span class="n">fm</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="mi">7</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">fm</span>
+<span class="go">Fixmat with 932 fixations and the following data fields:</span>
+<span class="go">          Field Name |     Length    |    Type    |        Values</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">            category |      932      |   int32    |         [7]</span>
+<span class="go">                 end |      932      |   int32    |         Many</span>
+<span class="go">                 fix |      932      |   uint8    |         Many</span>
+<span class="go">        SUBJECTINDEX |      932      |   uint8    |         [36]</span>
+<span class="go">               start |      932      |   int32    |         Many</span>
+<span class="go">            on_image |      932      |   uint8    |        [0 1]</span>
+<span class="go">                   y |      932      |  float32   |         Many</span>
+<span class="go">                   x |      932      |  float32   |         Many</span>
+<span class="go">          filenumber |      932      |   uint16   |         Many</span>
+<span class="go">           condition |      932      |   uint8    |         [1]</span>
+<span class="go">---------------------+---------------+------------+----------------</span>
+<span class="go">      Parameter Name | Value</span>
+<span class="go">---------------------+---------------------------------------------</span>
+<span class="go">          image_size | [960, 1280]</span>
+<span class="go">   pixels_per_degree | 45</span>
+</pre></div>
+</div>
+<p>How does this work? The expression in the brackets is evaluated for every entry in
+the <em>fm.category</em> field. This results in a vector of booleans that has the same size
+as the <em>fm.category</em> field. Using the square brackets applies this logical index to all
+fields of the datamat. Several logical expressions can be combined with logical operators.
+In contrast to matlab the <em>logical</em> operators have stronger binding than the <em>comparison</em>
+operators. Thus, <em>fm.category == 1 &amp; fm.SUBJECTINDEX == 2</em> will produce an error because
+python will try to bind <em>1 &amp; fm.SUBJECTINDEX</em>. To filter correctly, you have to use
+parenthesis (see next example).</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="kn">import</span> <span class="nn">pylab</span> <span class="kn">as</span> <span class="nn">plot</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">FixmatFactory</span><span class="p">(</span><span class="s">&#39;../ocupy/test/datamat_demo.mat&#39;</span><span class="p">)</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fm</span><span class="p">[(</span><span class="n">fm</span><span class="o">.</span><span class="n">filenumber</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">fm</span><span class="o">.</span><span class="n">category</span> <span class="o">==</span> <span class="mi">7</span><span class="p">)]</span>
+<span class="n">fdm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">compute_fdm</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span><span class="n">scale_factor</span><span class="o">=</span><span class="mf">0.25</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">fdm</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>(<a class="reference external" href=".//datamat-2.py">Source code</a>)</p>
+<p>In matlab we would traditionally use for loops over all unique values of a field
+to iterate over the field. In python this is easier, we can simply use the <tt class="xref py py-func docutils literal"><span class="pre">by_field()</span></tt>
+method:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">fm</span> <span class="o">=</span> <span class="n">TestFixmatFactory</span><span class="p">(</span><span class="n">categories</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>
+        <span class="n">filenumbers</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">subjectindices</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<span class="k">for</span> <span class="n">cat_mat</span> <span class="ow">in</span> <span class="n">fm</span><span class="o">.</span><span class="n">by_field</span><span class="p">(</span><span class="s">&#39;category&#39;</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">img_mat</span> <span class="ow">in</span> <span class="n">cat_mat</span><span class="o">.</span><span class="n">by_field</span><span class="p">(</span><span class="s">&#39;filenumber&#39;</span><span class="p">):</span>
+            <span class="c"># The img_mat now contains all fixation data for one image</span>
+            <span class="c"># in one cagegory</span>
+            <span class="k">pass</span>
+</pre></div>
+</div>
+<p>There are some other usefull functions (<tt class="xref py py-func docutils literal"><span class="pre">add_field()</span></tt>, <tt class="xref py py-func docutils literal"><span class="pre">join()</span></tt>, <tt class="xref py py-func docutils literal"><span class="pre">parameters()</span></tt> and
+<tt class="xref py py-func docutils literal"><span class="pre">fieldnames()</span></tt>). See the following reference section for more details.</p>
+</div>
+<div class="section" id="computing-a-fixation-density-map">
+<h2>Computing a fixation density map<a class="headerlink" href="#computing-a-fixation-density-map" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">ocupy</span> <span class="kn">import</span> <span class="n">fixmat</span>
+<span class="kn">import</span> <span class="nn">pylab</span> <span class="kn">as</span> <span class="nn">plot</span>
+<span class="n">points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span><span class="mi">100</span><span class="p">))</span><span class="o">*</span><span class="mi">500</span>
+<span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">TestFixmatFactory</span><span class="p">(</span><span class="n">points</span> <span class="o">=</span> <span class="n">points</span><span class="p">,</span> <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;image_size&#39;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">500</span><span class="p">,</span><span class="mi">500</span><span class="p">]})</span>
+<span class="n">fdm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">compute_fdm</span><span class="p">(</span><span class="n">fm</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">fdm</span><span class="p">)</span>
+<span class="n">plot</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>(<a class="reference external" href=".//datamat-3.py">Source code</a>, <a class="reference external" href=".//datamat-3.png">png</a>, <a class="reference external" href=".//datamat-3.hires.png">hires.png</a>, <a class="reference external" href=".//datamat-3.pdf">pdf</a>)</p>
+<div class="figure">
+<img alt="_images/datamat-3.png" src="_images/datamat-3.png" />
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/logo.png" alt="Logo"/>
+            </a></p>
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">DataMat</a><ul>
+<li><a class="reference internal" href="#generating-a-datamat">Generating a datamat</a><ul>
+<li><a class="reference internal" href="#the-vectorfactory">The VectorFactory</a></li>
+<li><a class="reference internal" href="#the-accumulatorfactory">The AccumulatorFactory</a></li>
+<li><a class="reference internal" href="#the-datamataccumulator">The DatamatAccumulator</a></li>
+<li><a class="reference internal" href="#using-the-fixmatfactory">Using the FixmatFactory</a></li>
+<li><a class="reference internal" href="#using-the-directoryfixmatfactory">Using the DirectoryFixmatFactory</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#working-with-datamats">Working with datamats</a></li>
+<li><a class="reference internal" href="#computing-a-fixation-density-map">Computing a fixation density map</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">Welcome to ocupy&#8217;s documentation!</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="fixmat.html"
+                        title="next chapter">FixMat</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/datamat.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="fixmat.html" title="FixMat"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to ocupy’s documentation!"
+             >previous</a> |</li>
+        <li><a href="index.html">res.analysis 0.01 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, WhiteMatter Labs GmbH.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2b1.
+    </div>
+  </body>
+</html>
