@@ -1,0 +1,680 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Organization of stimuli: categories, images and features &mdash; ocupy v0.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="ocupy v0.1 documentation" href="index.html" />
+    <link rel="next" title="Loader" href="loader.html" />
+    <link rel="prev" title="Parallel" href="parallel.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="loader.html" title="Loader"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="parallel.html" title="Parallel"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="organization-of-stimuli-categories-images-and-features">
+<h1>Organization of stimuli: categories, images and features<a class="headerlink" href="#organization-of-stimuli-categories-images-and-features" title="Permalink to this headline">¶</a></h1>
+<p>This module aims at providing easy access to images and feature maps.
+It respects that images are organized in different categories.</p>
+<p>Using this module has several advantages over simply loading images or
+feature maps at runtime:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><strong>Alignment</strong>: You can iterate over images and access all fixations made on this image. The access is handled transparently for you.</li>
+<li><strong>Abstraction</strong>: If treated right, it doesn&#8217;t matter where or how your data is organized. Stored in the web? Strange naming conventions? No problem, but you will have to adapt some minor things in the backend. The interface however stays.</li>
+</ol>
+</div></blockquote>
+<p>The graph below describes the dependency structure of classes within the stimulus module. The general idea is that images are organized in categories (one category maps to many images) and that images provide access to the raw image data and to features of the image (again a 1:n mapping). Data is loaded via a proxy class which abstracts from the actual access (this is a n:1 mapping).</p>
+<p class="graphviz">
+<img src="_images/graphviz-126d1229a2ba3485cf56fea510bbd85613654994.png" alt="digraph Stimuli {
+        node [shape = record,height=.1];
+        node0[label = &quot;&lt;f0&gt; Category 1 | &lt;f1&gt; Category 2&quot;];
+        node1[label = &quot;&lt;f0&gt; Image 1 | ... | &lt;f1&gt; Image n&quot;];
+        node2[label = &quot;&lt;f0&gt; Image 1 | ... | &lt;f1&gt; Image n&quot;];
+        node3[label = &quot;&lt;f0&gt; Image Data | &lt;f1&gt; Feature 1 | ... | &lt;f2&gt; Feature n&quot;];
+        node4[label = &quot;&lt;f0&gt; Image Data | &lt;f1&gt; Feature 1 | ... | &lt;f2&gt; Feature n&quot;];
+        &quot;node0&quot;:f0 -&gt; &quot;node1&quot;:f0;
+        &quot;node0&quot;:f1 -&gt; &quot;node2&quot;:f0;
+        &quot;node1&quot;:f0 -&gt; &quot;node3&quot;:f0;
+        &quot;node2&quot;:f0 -&gt; &quot;node4&quot;:f0;
+        &quot;node4&quot;:f0 -&gt; Loader;
+        &quot;node4&quot;:f1 -&gt; Loader;
+        &quot;node4&quot;:f2 -&gt; Loader;
+        &quot;node3&quot;:f0 -&gt; Loader;
+        &quot;node3&quot;:f1 -&gt; Loader;
+        &quot;node3&quot;:f2 -&gt; Loader;
+}" />
+</p>
+<p>The remainder of this document describes the interface of the stimuli
+module and how it interacts with the loader module.</p>
+<div class="section" id="loading-data-from-somewhere">
+<h2>Loading Data from somewhere<a class="headerlink" href="#loading-data-from-somewhere" title="Permalink to this headline">¶</a></h2>
+<p>To access images and feature maps, we need to be able to load them into
+memory. This task is carried out by the <em>loader</em>. It encapsulates the
+direct data access, such that we do not have to worry about it later.</p>
+<p>Let&#8217;s look at an example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">l</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">LoadFromDisk</span><span class="p">(</span><span class="s">&#39;my-images&#39;</span><span class="p">,</span> <span class="s">&#39;my-features&#39;</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="p">(</span><span class="mi">768</span><span class="p">,</span><span class="mi">1024</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">l</span><span class="o">.</span><span class="n">get_image</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">17</span><span class="p">)</span>
+<span class="go">-&gt; Returns image 17 in category 2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">l</span><span class="o">.</span><span class="n">get_feature</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">17</span><span class="p">,</span><span class="s">&#39;BYCHigh&#39;</span><span class="p">)</span>
+<span class="go">-&gt; Returns feature BYCHigh for image 17 in category 2</span>
+</pre></div>
+</div>
+<p>In this case we use a loader that reads features and images from the hard disk.
+In the constructor, we specify where the images and features are located. A
+neat functionality is that the &#8216;LoadFromDisk&#8217; loader can automatically resize images and
+features to the same size (given by the size argument). By default
+&#8216;LoadFromDisk&#8217;
+respects the following file layout: my-images/category/category_image.png
+and my-features/category/feature/category_image.mat
+If you use a different naming scheme it is easy to rip the standard out and plug
+in your naming scheme. All you have to do is to replace LoadFromDisk&#8217;s &#8216;path&#8217; function:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">l</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">LoadFromDisk</span><span class="p">(</span><span class="s">&#39;my-images&#39;</span><span class="p">,</span> <span class="s">&#39;my-features&#39;</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="p">(</span><span class="mi">768</span><span class="p">,</span><span class="mi">1024</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">my_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">category</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">image</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">feature</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+<span class="go">        if not category is None:</span>
+<span class="go">            return self.impath</span>
+<span class="go">        if not image is None:</span>
+<span class="go">            assert not category is None, &quot;The category has to be given if the image is given&quot;</span>
+<span class="go">            return os.path.join(self.impath, &#39;%i_%i.png&#39;%(category,image))</span>
+<span class="go">        if not feature is None:</span>
+<span class="go">            assert category != None and image != None, (&quot;If a feature name is&quot; +</span>
+<span class="go">                                &quot;given the category and image also have to be given.&quot;)</span>
+<span class="go">            return os.path.join(self.impath, &#39;%i_%i_%f.mat&#39;%(category,image,feature))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">l</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">my_path</span>
+</pre></div>
+</div>
+<p>And now the loader will respect a my-images/category_image.png and
+my-images/category_image_feature.mat naming scheme. You can of course also inherit
+from LoadFromDisk and overwrite the path method if you want to use this naming
+scheme more often.</p>
+<p>To use a completely different loader (say, one that pulls stimuli from a
+SQL database) you have to implement your own. To achieve this, inherit
+from loader.Loader and fill all methods specified there with life.</p>
+</div>
+<div class="section" id="working-with-the-stimulus-module">
+<h2>Working with the stimulus module<a class="headerlink" href="#working-with-the-stimulus-module" title="Permalink to this headline">¶</a></h2>
+<p>To abstract the data access is a first step but does not provide much in terms of
+convenience. The stimuli module defines three classes that organize stimuli into
+categories, images and features:</p>
+<blockquote>
+<div><ul class="simple">
+<li>The <strong>Categories</strong> class encapsulates different categories that are available</li>
+<li>The <strong>Images</strong> class represents all images within a category</li>
+<li>The <strong>Image</strong> class provides direct access to the image data and feature maps of the image</li>
+</ul>
+</div></blockquote>
+<p>I think the interface is pretty much self-explaining:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">l</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">LoadFromDisk</span><span class="p">(</span><span class="s">&#39;path-to-my-images&#39;</span><span class="p">,</span> <span class="s">&#39;path-to-my-features&#39;</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="p">(</span><span class="mi">768</span><span class="p">,</span><span class="mi">1024</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inp</span> <span class="o">=</span> <span class="n">stimuli</span><span class="o">.</span><span class="n">Categories</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="n">features</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span><span class="n">img_per_cat</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2</span><span class="p">:</span><span class="nb">range</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span><span class="mi">26</span><span class="p">),</span><span class="mi">9</span><span class="p">:</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">51</span><span class="p">)})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inp</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">17</span><span class="p">]</span><span class="o">.</span><span class="n">data</span> <span class="c"># yields image 17 in category 2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inp</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">17</span><span class="p">][</span><span class="s">&#39;BYCHigh&#39;</span><span class="p">]</span> <span class="c"># yields feature BYCHigh</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">cat</span> <span class="ow">in</span> <span class="n">inp</span><span class="p">:</span>
+<span class="go">        for img in cat:</span>
+<span class="go">            img.data # Gives the image</span>
+<span class="go">            img[&#39;BYCHigh&#39;] # Gives feature BYCHigh</span>
+</pre></div>
+</div>
+<p>In this case, I specified all possible category / image combinations.
+Often we want to access images and features that have been arranged by
+some structure beforehand. The most obvious case is that we have a fixmat that already specifies all possible category, and image combinations. To create a stimuli object that is aligned to a fixmat we can use the <strong>FixmatStimuliFactory</strong>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">DirectoryFixmatFactory</span><span class="p">(</span><span class="s">&#39;path-to-fixmats&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">l</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">LoadFromDisk</span><span class="p">(</span><span class="n">impath</span> <span class="o">=</span> <span class="s">&#39;path-to-imgs&#39;</span><span class="p">,</span> <span class="n">ftrpath</span> <span class="o">=</span> <span class="s">&#39;path-to-ftrs&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">stim</span> <span class="o">=</span> <span class="n">stimuli</span><span class="o">.</span><span class="n">FixmatStimuliFactory</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span> <span class="n">l</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Alternatively we can use the <strong>DirectoryStimuliFactory</strong> to automatically index all categories and files in a directory:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">stim</span> <span class="o">=</span> <span class="n">stimuli</span><span class="o">.</span><span class="n">DirectoryStimuliFactory</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">stim</span><span class="o">.</span><span class="n">categories</span><span class="p">()</span>
+<span class="go">[2,9]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">stim</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">images</span><span class="p">()</span>
+<span class="go">[16, 17, ..., 25]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">stim</span><span class="p">[</span><span class="mi">9</span><span class="p">]</span><span class="o">.</span><span class="n">images</span><span class="p">()</span>
+<span class="go">[1, 2, ..., 50]</span>
+</pre></div>
+</div>
+<p>This, however, works only for the default file layout structure (cat/cat_img.png, cat/ftr/cat_img.mat).</p>
+</div>
+<div class="section" id="combining-fixation-data-and-stimulus-data">
+<h2>Combining fixation data and stimulus data<a class="headerlink" href="#combining-fixation-data-and-stimulus-data" title="Permalink to this headline">¶</a></h2>
+<p>In many cases, we want to iterate over images and fixation data at the same
+time. The stimuli module automatically aligns fixation and image data.</p>
+<p>To use this functionality the data proxy (i.e. categories, images or features)
+must be created with a FixMat:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">fm</span> <span class="o">=</span> <span class="n">fixmat</span><span class="o">.</span><span class="n">DirectoryFixmatFactory</span><span class="p">(</span><span class="s">&#39;my-fixmats&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inp</span> <span class="o">=</span> <span class="n">stimuli</span><span class="o">.</span><span class="n">Categories</span><span class="p">(</span><span class="n">l</span><span class="p">,</span><span class="n">fixations</span> <span class="o">=</span> <span class="n">fm</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">inp</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">17</span><span class="p">]</span><span class="o">.</span><span class="n">fixations</span>
+<span class="go">-&gt; FixMat that contains only fixations on image 17 fron category 2</span>
+</pre></div>
+</div>
+<p>If the data proxy is initialized with a set of possible category / image
+combinations we can also iterate over it. In this case it is probably
+handy to use the FixmatStimuliFactory which extracts all possible
+category / image combinations from a fixmat:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">inp</span> <span class="o">=</span> <span class="n">stimuli</span><span class="o">.</span><span class="n">FixmatStimuliFactory</span><span class="p">(</span><span class="n">fm</span><span class="p">,</span><span class="n">l</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">cat</span> <span class="ow">in</span> <span class="n">inp</span><span class="p">:</span>
+<span class="go">        for img in cat:</span>
+<span class="go">            img.fixations</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="reference">
+<h2>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="ocupy.stimuli.FixmatStimuliFactory">
+<tt class="descclassname">ocupy.stimuli.</tt><tt class="descname">FixmatStimuliFactory</tt><big>(</big><em>fm</em>, <em>loader</em><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#FixmatStimuliFactory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.FixmatStimuliFactory" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constructs an categories object for all image / category 
+combinations in the fixmat.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>fm: FixMat</dt>
+<dd>Used for extracting valid category/image combination.</dd>
+<dt>loader: loader</dt>
+<dd>Loader that accesses the stimuli for this fixmat</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>Categories object</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="ocupy.stimuli.DirectoryStimuliFactory">
+<tt class="descclassname">ocupy.stimuli.</tt><tt class="descname">DirectoryStimuliFactory</tt><big>(</big><em>loader</em><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#DirectoryStimuliFactory"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.DirectoryStimuliFactory" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes an input path to the images folder of an experiment and generates
+automatically the category - filenumber list needed to construct an
+appropriate _categories object.</p>
+<dl class="docutils">
+<dt>Parameters :</dt>
+<dd><dl class="first last docutils">
+<dt>loader <span class="classifier-delimiter">:</span> <span class="classifier">Loader object which contains </span></dt>
+<dd><dl class="first last docutils">
+<dt>impath <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>path to the input, i.e. image-, files of the experiment. All
+subfolders in that path will be treated as categories. If no
+subfolders are present, category 1 will be assigned and all 
+files in the folder are considered input images. 
+Images have to end in &#8216;.png&#8217;.</dd>
+<dt>ftrpath <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd><p class="first">path to the feature folder. It is expected that the folder
+structure corresponds to the structure in impath, i.e.</p>
+<blockquote>
+<div>ftrpath/category/featurefolder/featuremap.mat</div></blockquote>
+<p class="last">Furthermore, features are assumed to be the same for all 
+categories.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<span class="target" id="module-ocupy.stimuli"></span><p>This module implements different model evaluation measures.</p>
+<dl class="class">
+<dt id="ocupy.stimuli.Categories">
+<em class="property">class </em><tt class="descclassname">ocupy.stimuli.</tt><tt class="descname">Categories</tt><big>(</big><em>loader</em>, <em>img_per_cat</em>, <em>features=None</em>, <em>fixations=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#Categories"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Categories" title="Permalink to this definition">¶</a></dt>
+<dd><p>This class represents different categories of stimuli.</p>
+<dl class="method">
+<dt id="ocupy.stimuli.Categories.categories">
+<tt class="descname">categories</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#Categories.categories"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Categories.categories" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of category numbers</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.stimuli.Categories.content">
+<tt class="descname">content</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#Categories.content"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Categories.content" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return category numbers and associated file numbers.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ocupy.stimuli.Categories.fixations">
+<tt class="descname">fixations</tt><a class="reference internal" href="_modules/ocupy/stimuli.html#Categories.fixations"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Categories.fixations" title="Permalink to this definition">¶</a></dt>
+<dd><p>Filter the fixmat such that it only contains fixations on images
+in categories that are also in the categories object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt>
+<tt class="descclassname">ocupy.stimuli.</tt><tt class="descname">DirectoryStimuliFactory</tt><big>(</big><em>loader</em><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#DirectoryStimuliFactory"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Takes an input path to the images folder of an experiment and generates
+automatically the category - filenumber list needed to construct an
+appropriate _categories object.</p>
+<dl class="docutils">
+<dt>Parameters :</dt>
+<dd><dl class="first last docutils">
+<dt>loader <span class="classifier-delimiter">:</span> <span class="classifier">Loader object which contains </span></dt>
+<dd><dl class="first last docutils">
+<dt>impath <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>path to the input, i.e. image-, files of the experiment. All
+subfolders in that path will be treated as categories. If no
+subfolders are present, category 1 will be assigned and all 
+files in the folder are considered input images. 
+Images have to end in &#8216;.png&#8217;.</dd>
+<dt>ftrpath <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd><p class="first">path to the feature folder. It is expected that the folder
+structure corresponds to the structure in impath, i.e.</p>
+<blockquote>
+<div>ftrpath/category/featurefolder/featuremap.mat</div></blockquote>
+<p class="last">Furthermore, features are assumed to be the same for all 
+categories.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<tt class="descclassname">ocupy.stimuli.</tt><tt class="descname">FixmatStimuliFactory</tt><big>(</big><em>fm</em>, <em>loader</em><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#FixmatStimuliFactory"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Constructs an categories object for all image / category 
+combinations in the fixmat.</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd><dl class="first last docutils">
+<dt>fm: FixMat</dt>
+<dd>Used for extracting valid category/image combination.</dd>
+<dt>loader: loader</dt>
+<dd>Loader that accesses the stimuli for this fixmat</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>Categories object</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="ocupy.stimuli.Image">
+<em class="property">class </em><tt class="descclassname">ocupy.stimuli.</tt><tt class="descname">Image</tt><big>(</big><em>loader</em>, <em>category</em>, <em>image</em>, <em>features=None</em>, <em>fixations=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#Image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represents a single stimulus</p>
+<dl class="attribute">
+<dt id="ocupy.stimuli.Image.data">
+<tt class="descname">data</tt><a class="reference internal" href="_modules/ocupy/stimuli.html#Image.data"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Image.data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the image data for this ctegory/image combination.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.stimuli.Image.features">
+<tt class="descname">features</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#Image.features"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Image.features" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns features associated to this image.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ocupy.stimuli.Image.fixations">
+<tt class="descname">fixations</tt><a class="reference internal" href="_modules/ocupy/stimuli.html#Image.fixations"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Image.fixations" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns all fixations that are on this image.
+A precondition for this to work is that a fixmat 
+is associated with this Image object.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ocupy.stimuli.Images">
+<em class="property">class </em><tt class="descclassname">ocupy.stimuli.</tt><tt class="descname">Images</tt><big>(</big><em>loader</em>, <em>images</em>, <em>category</em>, <em>features=None</em>, <em>fixations=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#Images"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Images" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represents all stimuli that are in a category.</p>
+<dl class="method">
+<dt id="ocupy.stimuli.Images.images">
+<tt class="descname">images</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/ocupy/stimuli.html#Images.images"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.stimuli.Images.images" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list image numbers.</p>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-ocupy.loader"></span><p>This module abstracts access to stimuli from physical access to it.</p>
+<dl class="class">
+<dt id="ocupy.loader.LoadFromDisk">
+<em class="property">class </em><tt class="descclassname">ocupy.loader.</tt><tt class="descname">LoadFromDisk</tt><big>(</big><em>impath=None</em>, <em>ftrpath=None</em>, <em>size=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk" title="Permalink to this definition">¶</a></dt>
+<dd><p>A loader implementation that loads images and features 
+from the hard disk. Resizes images and features to a common 
+size if needed.</p>
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.get_feature">
+<tt class="descname">get_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>feature</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.get_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.get_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load a feature from disk.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.get_image">
+<tt class="descname">get_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.get_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.get_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads an image from disk.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.path">
+<tt class="descname">path</tt><big>(</big><em>category=None</em>, <em>image=None</em>, <em>feature=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.path"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.path" title="Permalink to this definition">¶</a></dt>
+<dd><blockquote>
+<div>Constructs the path to categories, images and features.</div></blockquote>
+<p>This path function assumes that the following storage scheme is used on
+the hard disk to access categories, images and features:</p>
+<blockquote>
+<div><ul class="simple">
+<li>categories: /impath/category</li>
+<li>images:     /impath/category/category_image.png</li>
+<li>features:   /ftrpath/category/feature/category_image.mat</li>
+</ul>
+</div></blockquote>
+<p>The path function is called to query the location of categories, images
+and features before they are loaded. Thus, if your features are organized 
+in a different way, you can simply replace this method such that it returns
+appropriate paths&#8217; and the LoadFromDisk loader will use your naming
+scheme.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.test_for_category">
+<tt class="descname">test_for_category</tt><big>(</big><em>cat</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.test_for_category"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.test_for_category" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if category cat exists.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.test_for_feature">
+<tt class="descname">test_for_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>ftr</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.test_for_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.test_for_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if feature ftr exists for image img in category cat</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.LoadFromDisk.test_for_image">
+<tt class="descname">test_for_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#LoadFromDisk.test_for_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.LoadFromDisk.test_for_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if image img in category cat exists</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ocupy.loader.Loader">
+<em class="property">class </em><tt class="descclassname">ocupy.loader.</tt><tt class="descname">Loader</tt><big>(</big><em>impath=None</em>, <em>ftrpath=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader" title="Permalink to this definition">¶</a></dt>
+<dd><p>Represents an interface that encapsulates physical access to 
+images and features.</p>
+<dl class="method">
+<dt id="ocupy.loader.Loader.get_feature">
+<tt class="descname">get_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>feature</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.get_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.get_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the feature indexed by (cat,img,feature) as numpy matrix.</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string with str()</dt>
+<dd>The category of the image for which the feature should be
+loaded.</dd>
+<dt>img: Convertible to string with str()</dt>
+<dd>The image to which the feature belongs.</dd>
+<dt>feature: string.</dt>
+<dd>Name of the feature.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>numpy.ndarray: The feature as a numpy matrix.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.get_image">
+<tt class="descname">get_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.get_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.get_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the image indexed by (cat,img) as numpy matrix.</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: convertible to string with str().</dt>
+<dd>The category of the image that needs to be loaded.</dd>
+<dt>img: convertible to string with str()</dt>
+<dd>The image that needs to be loaded.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>numpy.ndarray: The image in matrix form.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.path">
+<tt class="descname">path</tt><big>(</big><em>*args</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.path"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.path" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constructs path or URL to cat/img/ftr from <a href="#id1"><span class="problematic" id="id2">*</span></a>args</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.save_feature">
+<tt class="descname">save_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>feature</em>, <em>data</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.save_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.save_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the feature that is indexed by (cat, img, feature) [optional].</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string with str()</dt>
+<dd>The category of the image of the feature that needs to be saved.</dd>
+<dt>img: Convertible to string with str()</dt>
+<dd>The image identifier of the feature to be saved.</dd>
+<dt>data: numpy.ndarray.</dt>
+<dd>Feature in matrix form.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.save_image">
+<tt class="descname">save_image</tt><big>(</big><em>cat</em>, <em>img</em>, <em>data</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.save_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.save_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the image that is indexed by (cat, img) [optional].</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string with str()</dt>
+<dd>The category of the image that needs to be saved.</dd>
+<dt>img: Convertible to string with str()</dt>
+<dd>The image identifier of the image to be saved.</dd>
+<dt>data: numpy.ndarray.</dt>
+<dd>Image in matrix form.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.test_for_category">
+<tt class="descname">test_for_category</tt><big>(</big><em>cat</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.test_for_category"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.test_for_category" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if category cat exists.</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string via str()</dt>
+<dd>The category to test for.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>boolean: True if the category exists and False otherwise.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.test_for_feature">
+<tt class="descname">test_for_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>ftr</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.test_for_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.test_for_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if feature ftr exists for image img in category cat.</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string via str()</dt>
+<dd>The category to test for.</dd>
+<dt>img: Convertible to string via str()</dt>
+<dd>The image to test for</dd>
+<dt>feature: string</dt>
+<dd>Feature to test for.</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>boolean: True if the feature exist and False otherwise.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.Loader.test_for_image">
+<tt class="descname">test_for_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#Loader.test_for_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.Loader.test_for_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if image img in category cat exists</p>
+<dl class="docutils">
+<dt>Input:</dt>
+<dd><dl class="first last docutils">
+<dt>cat: Convertible to string via str()</dt>
+<dd>The category to test for.</dd>
+<dt>img: Convertible to string via str()</dt>
+<dd>The image to test for</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>boolean: True if the image exists in the category and False otherwise.</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ocupy.loader.SaveToDisk">
+<em class="property">class </em><tt class="descclassname">ocupy.loader.</tt><tt class="descname">SaveToDisk</tt><big>(</big><em>impath=None</em>, <em>ftrpath=None</em>, <em>size=None</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#SaveToDisk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.SaveToDisk" title="Permalink to this definition">¶</a></dt>
+<dd><p>A loader that adds functionality to save images or features.</p>
+<dl class="method">
+<dt id="ocupy.loader.SaveToDisk.save_feature">
+<tt class="descname">save_feature</tt><big>(</big><em>cat</em>, <em>img</em>, <em>feature</em>, <em>data</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#SaveToDisk.save_feature"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.SaveToDisk.save_feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves a new feature.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.SaveToDisk.save_image">
+<tt class="descname">save_image</tt><big>(</big><em>cat</em>, <em>img</em>, <em>data</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#SaveToDisk.save_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.SaveToDisk.save_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves a new image.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ocupy.loader.TestLoader">
+<em class="property">class </em><tt class="descclassname">ocupy.loader.</tt><tt class="descname">TestLoader</tt><big>(</big><em>img_per_cat=None</em>, <em>features=None</em>, <em>size=(10</em>, <em>10)</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#TestLoader"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.TestLoader" title="Permalink to this definition">¶</a></dt>
+<dd><p>A loader used for testing the stimuli.* class. Simply 
+returns (cat, img) or (cat,img,feature).</p>
+<dl class="method">
+<dt id="ocupy.loader.TestLoader.test_for_category">
+<tt class="descname">test_for_category</tt><big>(</big><em>cat</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#TestLoader.test_for_category"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.TestLoader.test_for_category" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if category cat exists.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ocupy.loader.TestLoader.test_for_image">
+<tt class="descname">test_for_image</tt><big>(</big><em>cat</em>, <em>img</em><big>)</big><a class="reference internal" href="_modules/ocupy/loader.html#TestLoader.test_for_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ocupy.loader.TestLoader.test_for_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests if image img in category cat exists</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/logo.png" alt="Logo"/>
+            </a></p>
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Organization of stimuli: categories, images and features</a><ul>
+<li><a class="reference internal" href="#loading-data-from-somewhere">Loading Data from somewhere</a></li>
+<li><a class="reference internal" href="#working-with-the-stimulus-module">Working with the stimulus module</a></li>
+<li><a class="reference internal" href="#combining-fixation-data-and-stimulus-data">Combining fixation data and stimulus data</a></li>
+<li><a class="reference internal" href="#reference">Reference</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="parallel.html"
+                        title="previous chapter">Parallel</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="loader.html"
+                        title="next chapter">Loader</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/stimuli.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="loader.html" title="Loader"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="parallel.html" title="Parallel"
+             >previous</a> |</li>
+        <li><a href="index.html">ocupy v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2010, WhiteMatter Labs GmbH.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
