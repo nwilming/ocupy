@@ -58,7 +58,7 @@ def saccade_detection(samplemat, Hz=200, threshold = 30,
         borders = np.hstack(([0], borders))
     
     for i,(start, end) in enumerate(zip(borders[0::2], borders[1::2])):
-        if 1000*(end-start)/Hz < 21:
+        if 1000*(end-start)/Hz < min_duration:
             saccade[start:end] = 1
     dists_ok = False
     while not dists_ok:
@@ -73,7 +73,7 @@ def saccade_detection(samplemat, Hz=200, threshold = 30,
             nextx = samplemat.x[nfixstart:nfixend].mean()
             nexty = samplemat.y[nfixstart:nfixend].mean()
             distance = ((nextx-lastx)**2+(nexty-lasty)**2)**.5
-            if distance < .35:
+            if distance < min_movement:
                 num_merges +=1
                 dists_ok = False
                 saccade[start:end] = 0
