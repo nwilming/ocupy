@@ -5,6 +5,8 @@ import numpy as np
 from utils import snip_string_middle, isiterable
 import h5py
 from numpy import ma
+
+
 class Datamat(object):
     """
     Represents grouped data.
@@ -546,6 +548,17 @@ def fromhdf5(fm_group):
     return VectorFactory(dm, params)
        
 def VectorFactory(fields, parameters, categories = None):
+    '''
+    Creates a datamat from a dictionary that contains lists/arrays as values.
+
+    Input:
+        fields: Dictionary
+            The values will be used as fields of the datamat and the keys
+            as field names.
+        parameters: Dictionary
+            A dictionary whose values are added as parameters. Keys are used
+            for parameter names.
+    '''
     fm = Datamat(categories = categories)
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
