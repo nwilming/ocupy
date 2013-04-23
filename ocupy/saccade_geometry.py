@@ -108,12 +108,21 @@ def predict_fixation_duration(durations, angles, length_diffs, dataset=None, par
             params['s'+str(i)] = s
     return corrected_durations
 
-def subject_predictions(fma, field = 'SUBJECTINDEX', 
+def subject_predictions(fm, field = 'SUBJECTINDEX', 
         method = predict_fixation_duration, data = None):
-    
+    '''
+    Calculates the saccadic momentum effect for individual subjects.
+
+    Removes any effect of amplitude differences.
+
+    The parameters are fitted on unbinned data. The effects are 
+    computed on binned data. See e_dist and e_angle for the binning
+    parameter.
+    '''
     if data is None:
-        print 'Doing it myself'
         fma, dura, faa, adsa, ldsa = prepare_data(fm, dur_cap = 700, max_back=5)
+        adsa = adsa[0]
+        ldsa = ldsa[0]
     else:
         fma, dura, faa, adsa, ldsa = data
     fma = fma.copy()#[ones(fm.x.shape)]
@@ -132,7 +141,7 @@ def subject_predictions(fma, field = 'SUBJECTINDEX',
         sub_predictions += [saccadic_momentum_effect(prediction, fa)]
         sub_effects += [saccadic_momentum_effect(dur-ld_corrected, fa)]
         parameters +=[ps]
-    return np.array(sub_effects), np.array(sub_predictions), dur-ld_corrected, parameters
+    return np.array(sub_effects), np.array(sub_predictions),  parameters
 
 def leastsq_dual_model(fa,  dl, split, intercept, slope1, slope2,  slope3, slope4): 
         breakdummy = fa<split
