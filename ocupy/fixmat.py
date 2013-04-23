@@ -273,7 +273,7 @@ def DirectoryFixmatFactory(directory, categories = None, glob_str = '*.mat', var
     if len(files) == 0:
         raise ValueError("Could not find any fixmats in " + 
             join(directory, glob_str))
-    f_all = FixmatFactory(files.pop(), categories)
+    f_all = FixmatFactory(files.pop(), categories, var_name)
     for fname in files:
         f_current = FixmatFactory(fname, categories, var_name)
         f_all.join(f_current)
