@@ -398,8 +398,9 @@ def pad_vector(data, center, window, pad_element=np.NaN):
     dtype=type(pad_element)
     
     out_size = max(0,window[1]-window[0])
-    out = ma.masked_all(out_size,dtype)
+    out = ma.ones(out_size,dtype) * pad_element
     out.set_fill_value(pad_element)
+    out.mask=True
     #print num_pre,sidx,eidx,num_post
     if sidx < 0:
         num_pre = -sidx
