@@ -101,7 +101,8 @@ def fixation_detection(samplemat, saccades, Hz=200, samples2fix = None):
             metadata should be collapsed for one fixation. It contains 
             field names from samplemat as keys and functions as values that 
             return one value when they are called with all samples for one
-            fixation.
+            fixation. In addition the function can raise an 'InvalidFixation' 
+            exception to signal that the fixation should be discarded.
     '''
     if samples2fix is None:
         samples2fix = {}
@@ -113,21 +114,26 @@ def fixation_detection(samplemat, saccades, Hz=200, samples2fix = None):
         borders = np.hstack(([0], borders))
     lasts,laste = borders[0], borders[1]
     for i,(start, end) in enumerate(zip(borders[0::2], borders[1::2])):
-        current = {}
-        for k in samplemat.fieldnames():
-            if k in samples2fix.keys():
-                current[k] = samples2fix[k](samplemat.field(k)[start:end])
-            else:
-                current[k] = np.mean(samplemat.field(k)[start:end])
-        current['start_sample'] = start
-        current['end_sample'] = end
-        fixations[start:end] = 1
-        # Calculate start and end time in ms
-        current['start'] = 1000*start/Hz
-        current['end'] = 1000*end/Hz
-        lasts, laste = start,end
-        acc.update(current)
+        try:
+            current = {}
+            for k in samplemat.fieldnames():
+                if k in samples2fix.keys():
+                    current[k] = samples2fix[k](samplemat.field(k)[start:end])
+                else:
+                    current[k] = np.mean(samplemat.field(k)[start:end])
+            current['start_sample'] = start
+            current['end_sample'] = end
+            fixations[start:end] = 1
+            # Calculate start and end time in ms
+            current['start'] = 1000*start/Hz
+            current['end'] = 1000*end/Hz
+            lasts, laste = start,end
+            acc.update(current)
+        except InvalidFixation:
+            pass
     return acc.get_dm(params=samplemat.parameters()), fixations.astype(bool)
 
+class InvalidFixation(Exception):
+    pass
 
 
