@@ -12,7 +12,6 @@ from numpy import ma
 from utils import snip_string_middle, isiterable
 #from scipy.stats import nanmean,nanmedian
 import h5py
-import ipdb #@UnusedImport
 
 class Datamat(object):
     """
@@ -34,7 +33,7 @@ class Datamat(object):
     datamat.y    # Returns a list of y-coordinates
 
     In this case a single index into any one of these lists represents a 
-    fixation:
+    fixation.
 
     .. note:: It is never necessary to create a Datamat object directly. 
         This is handled by Datamat factories.
@@ -335,8 +334,8 @@ class Datamat(object):
         non-existent data.
        	
         Examples:
-        	TODO: Make example more generic, remove interoceptive reference
-			TODO: Make stand-alone test
+            TODO: Make example more generic, remove interoceptive reference
+            TODO: Make stand-alone test
         
         >> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
         >> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
@@ -415,7 +414,7 @@ class Datamat(object):
         Adds a parameter to the existing Datamat.
         
         Fails if parameter with same name already exists or if name is otherwise
-        in this objects ___dict__ dictionary.
+        in this object's ___dict__ dictionary.
         """
         if self._parameters.has_key(name):
             raise ValueError("'%s' is already a parameter" % (name))
@@ -453,26 +452,19 @@ class Datamat(object):
         self.rm_parameter(name)
         self.add_field(name, data)
         
-    def join(self, fm_new, minimal_subset=True):
+    def join(self, fm_new):
         """
-        Adds content of a new Datamat to this Datamat.
+        Adds content of a new Datamat to this Datamat, assuming same fields.
        
         If a parameter of the Datamats is not equal or does not exist
         in one, it is promoted to a field.
         
-        If the two Datamats have different fields then the elements for the
-        Datamats that did not have the field will be NaN, unless
-        'minimal_subset' is true, in which case the mismatching fields will
+        If the two Datamats have different fields, the mismatching fields will
         simply be deleted.
         
         Parameters
         fm_new : instance of Datamat
             This Datamat is added to the current one.
-        minimal_subset : if true, remove fields which don't exist in both,
-        	instead of using NaNs for missing elements (defaults to False)
-
-        Capacity to use superset of fields added by rmuil 2012/01/30
-
         """
         # Check if parameters are equal. If not, promote them to fields.
         for (nm, val) in self._parameters.items():
@@ -493,21 +485,16 @@ class Datamat(object):
         # First those in self that do not exist in new...
         orig_fields = self._fields[:]
         for field in orig_fields:
+            
             if not field in fm_new._fields:
-                if minimal_subset:
-                    self.rm_field(field)
-                else:
-                    warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
-                    fm_new.add_field_like(field, self.field(field))
+                self.rm_field(field)
+                warnings.warn("field '%s' doesn't exist in target DataMat, removing."%field)
         # ... then those in the new that do not exist in self.
         orig_fields = fm_new._fields[:]
         for field in orig_fields:
             if not field in self._fields:
-                if minimal_subset:
-                    fm_new.rm_field(field)
-                else:
-                    warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
-                    self.add_field_like(field, fm_new.field(field))
+                fm_new.rm_field(field)
+                warnings.warn("field '%s' doesn't exist in source DataMat, removing."%field)
 
         # Concatenate fields
         for field in self._fields:
@@ -515,7 +502,59 @@ class Datamat(object):
                 fm_new.__dict__[field]))
 
         # Update _num_fix
-        self._num_fix += fm_new._num_fix 
+        self._num_fix += fm_new._num_fix
+        
+    def join_full(self, dm_new):
+        """
+        Combines the content of two Datamats.
+       
+        If a parameter of the Datamats is not equal or does not exist
+        in one, it is promoted to a field.
+        
+        If the two Datamats have different fields then the elements for the
+        Datamats that did not have the field will be NaN.
+        
+        Parameters
+        dm_new : instance of Datamat
+            This Datamat is added to the current one.
+
+        Capacity to use superset of fields added by rmuil 2012/01/30
+
+        """
+        # Check if parameters are equal. If not, promote them to fields.
+        for (nm, val) in self._parameters.items():
+            if dm_new._parameters.has_key(nm):
+                if (val != dm_new._parameters[nm]):
+                    self.parameter_to_field(nm)
+                    dm_new.parameter_to_field(nm)
+            else:
+                self.parameter_to_field(nm)
+        for (nm, val) in dm_new._parameters.items():
+            if self._parameters.has_key(nm):
+                if (val != self._parameters[nm]):
+                    self.parameter_to_field(nm)
+                    dm_new.parameter_to_field(nm)
+            else:
+                dm_new.parameter_to_field(nm)
+        # Deal with mismatch in the fields
+        # First those in self that do not exist in new...
+        orig_fields = self._fields[:]
+        for field in orig_fields:
+            if not field in dm_new._fields:
+                dm_new.add_field_like(field, self.field(field))
+        # ... then those in the new that do not exist in self.
+        orig_fields = dm_new._fields[:]
+        for field in orig_fields:
+            if not field in self._fields:
+                self.add_field_like(field, dm_new.field(field))
+
+        # Concatenate fields
+        for field in self._fields:
+            self.__dict__[field] = ma.hstack((self.__dict__[field], 
+                dm_new.__dict__[field]))
+
+        # Update _num_fix
+        self._num_fix += dm_new._num_fix 
 
 def load(path):
     """
