@@ -425,6 +425,40 @@ def pad_vector(data, center, window, pad_element=np.NaN):
 
     return out
 
+def expand_boolean_subindex(overall_idx, subidx):
+    """
+    subidx is a boolean index referencing a subset of an array that is the length
+    of overall_idx, and overall_idx indicates where, in the original array, the
+    subidx refers to.
+    
+    This function turns the subidx back into a boolean array that will reference
+    the original array directly.
+    
+    Was constructed to allow indexing a DataMat using an index of a *subset* of
+    that DataMat (as returned, for example, by the by_field() function).
+    
+    
+    >>> ovi = np.array([0,1,1,1,0]).astype('bool')
+    >>> si  = np.array([1,0,1]).astype('bool')
+    >>> ei = expand_boolean_subindex(ovi,si)
+    >>> ','.join(['%d'%d for d in ei])
+    '0,1,0,1,0'
+    
+    >>> si  = np.array([0,0,1]).astype('bool')
+    >>> ei = expand_boolean_subindex(ovi,si)
+    >>> ','.join(['%d'%d for d in ei])
+    '0,0,0,1,0'
+    
+    """
+    
+    positions = np.where(overall_idx)[0]
+    false_positions = positions[~subidx]
+    
+    ei = overall_idx.copy()
+    ei[false_positions] = False
+    
+    return ei
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()

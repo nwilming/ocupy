@@ -259,20 +259,32 @@ class Datamat(object):
         """
         return self._parameters
                             
-    def by_field(self, field):
+    def by_field(self, field, return_overall_idx=False):
         """
         Returns an iterator that iterates over unique values of field
         
         Parameters:
             field : string
                 Filters the datamat for every unique value in field and yields 
-                the filtered datamat.
+                the filtered datamat.\
+            return_overall_idx : boolean
+                If true, will also return the index used to get each filtered
+                DataMat, to determine where in the original DataMat the filtered
+                DataMats come from. Use `ocupy.utils.expand_boolean_subindex()`
+                to use this overall_idx.
         Returns:
             datamat : Datamat that is filtered according to one of the unique
                 values in 'field'.
+            overall_idx : boolean array - the index into the original DataMat
+                used to retrieve this DataMat (only returned if
+                 return_overall_idx==True)
         """
         for value in np.unique(self.__dict__[field]):
-            yield self.filter(self.__dict__[field] == value)
+            overall_idx = self.__dict__[field] == value
+            if return_overall_idx:
+                yield (self.filter(overall_idx), overall_idx)
+            else:
+                yield self.filter(overall_idx)
     
     def add_field(self, name, data):
         """
