@@ -9,11 +9,9 @@ import h5py
 from warnings import warn
 from utils import snip_string_middle, isiterable, all_same
 import inspect
-import numpy as np
 
 try:
     dbg_lvl# @UndefinedVariable
-    print 'dbg_lvl == %d'%dbg_lvl  # @UndefinedVariable
 except NameError:
     dbg_lvl = 0
 
