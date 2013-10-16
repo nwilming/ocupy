@@ -12,12 +12,38 @@ except ImportError:
     have_image_library=False
 
 def isiterable(some_object):
+    """
+    determine if an object can be iterated or not.
+    """
     try:
         iter(some_object)
     except TypeError:
         return False
     return True
 
+def all_same(items):
+    """
+       http://stackoverflow.com/q/3844948/
+       TODO: is this the most efficient for NumPy arrays?
+       TODO: handle empty sequences.
+
+       >>> all_same([1,1,1])
+       True
+
+       >>> all_same([1,2,1])
+       False
+
+       >>> all_same(None)
+       True
+
+       >>> all_same([1])
+       True
+
+       ?TODO>>> all_same([])
+       True
+
+       """
+    return items is None or list(items).count(items[0]) == len(items)
 
 if have_image_library:
     def imresize(arr, newsize, interp='bicubic', mode=None):

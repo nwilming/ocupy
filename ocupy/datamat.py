@@ -3,24 +3,40 @@
 This module implements the Datamat Structure for managing data structured in 
 blocks (i.e. eye-tracking data.)
 """
-import warnings
-#from os.path import join
-#from warnings import warn
 import numpy as np
 from numpy import ma
-
-from utils import snip_string_middle, isiterable
-#from scipy.stats import nanmean,nanmedian
 import h5py
+from warnings import warn
+from utils import snip_string_middle, isiterable, all_same
+import inspect
+
+try:
+    dbg_lvl# @UndefinedVariable
+    print 'dbg_lvl == %d'%dbg_lvl  # @UndefinedVariable
+except NameError:
+    dbg_lvl = 0
+
+def dbg(lvl, msg):
+    if lvl <= dbg_lvl:
+        if lvl == 0:
+            print '%s'%msg
+        else:
+            caller_name = inspect.stack()[1][3]
+            print('dbg(%d|%s): %s'%(lvl, caller_name, msg))
+
+def set_dbg_lvl(new_dbg_lvl):
+    global dbg_lvl
+    dbg_lvl = new_dbg_lvl
+    print 'edfread.set_dbg_lvl(%d)'%(dbg_lvl)
 
 class Datamat(object):
     """
     Represents grouped data.
 
     The datamat holds, filters and stores attributes that are grouped by some 
-		event. For example, a group could be a trial in an experiment. The 
-		attributes of this group might be associated with the subject's name or a
-		trial condition.
+    event. For example, a group could be a trial in an experiment. The 
+    attributes of this group might be associated with the subject's name or a
+    trial condition.
      
     A datamat consists of lists called 'fields' which represent the raw
     underlying data and its attributes.
@@ -113,33 +129,6 @@ class Datamat(object):
                     value_str = type(dat[0]).__name__
                 else:
                     value_str = str(dat[0].dtype)+' arrays'
-                    
-#                    try:
-#                        minvals=[]
-#                        maxvals=[]
-#                        medvals=[]
-#                        menvals=[]
-#                        for el in dat:
-#                            if el is None:
-#                                continue
-#                            elm = ma.masked_invalid(el)
-#                            minvals.append(elm.min())
-#                            maxvals.append(elm.max())
-#                            medvals.append(ma.median(elm))
-#                            menvals.append(ma.mean(elm))
-#                            
-#                        minval = np.nanmax(minvals)
-#                        maxval = np.nanmax(maxvals)
-#                        medval = nanmedian(medvals)
-#                        menval = nanmean(menvals)
-#                        value_str = '%.2f<%.2f~%.2f<%.2f' % (minval,
-#                                                            medval,
-#                                                            menval,
-#                                                            maxval)
-#                    except Exception as ex:
-#                        print 'debug: %s: %s' % (field, ex)
-#                        raise ex
-#                        value_str = 'N/A'
 
             field_display_name = snip_string_middle(field, 20)
             desc += "%s | %s | %s | %s\n" % (field_display_name.rjust(20), 
@@ -184,11 +173,11 @@ class Datamat(object):
         the array says False. The logical array can conveniently be created
         with numpy::
         
-	        >> print np.unique(fm.category)
-	        np.array([2,9])
-	        >> fm_filtered = fm[ fm.category == 9 ]
-	        >> print np.unique(fm_filtered)
-	        np.array([9])
+          >> print np.unique(fm.category)
+          np.array([2,9])
+            >> fm_filtered = fm[ fm.category == 9 ]
+            >> print np.unique(fm_filtered)
+            np.array([9])
     
         Parameters:
             index : array
@@ -319,6 +308,7 @@ class Datamat(object):
         new_data.mask = True
         self.add_field(name, new_data)
 
+
     def annotate (self, src_dm, data_field, key_field, take_first=True):
         """
         Adds a new field (data_field) to the Datamat with data from the
@@ -344,7 +334,7 @@ class Datamat(object):
         
         The new field in the target Datamat will be a masked array to handle
         non-existent data.
-       	
+        
         Examples:
             TODO: Make example more generic, remove interoceptive reference
             TODO: Make stand-alone test
@@ -371,6 +361,7 @@ class Datamat(object):
         >> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
         False
         """
+        #warn(DeprecationWarning('Use datamat.merge() instead.'))
         if key_field not in self._fields or key_field not in src_dm._fields:
             raise AttributeError('key field (%s) must exist in both Datamats'%(key_field))
         if data_field not in src_dm._fields:
@@ -500,13 +491,13 @@ class Datamat(object):
             
             if not field in fm_new._fields:
                 self.rm_field(field)
-                warnings.warn("field '%s' doesn't exist in target DataMat, removing."%field)
+                warn("field '%s' doesn't exist in target DataMat, removing." % field)
         # ... then those in the new that do not exist in self.
         orig_fields = fm_new._fields[:]
         for field in orig_fields:
             if not field in self._fields:
                 fm_new.rm_field(field)
-                warnings.warn("field '%s' doesn't exist in source DataMat, removing."%field)
+                warn("field '%s' doesn't exist in source DataMat, removing." % field)
 
         # Concatenate fields
         for field in self._fields:
@@ -568,6 +559,123 @@ class Datamat(object):
         # Update _num_fix
         self._num_fix += dm_new._num_fix 
 
+#def merge (dm_l, dm_r, data_field, key_field):
+#    """
+#    Merges two DataMats.
+#
+#    This operation corresponds loosely to an SQL JOIN operation.
+#
+#    This is accomplished through the use of a key_field, which is
+#    used to determine how the data is copied. The key_field must
+#    provide a 1-to-1 mapping between the DataMats - that is, for
+#    every unique value of src_dm.field(key_field) there must exist
+#    only one element in self.field(key_field).
+#
+#    The two Datamats are essentially aligned by the unique values
+#    of key_field so that each block element of the new field of the target
+#    Datamat will consist of those elements of src_dm's data_field
+#    where the corresponding element in key_field matches.
+#
+#    The target Datamat (self) must not have a field name data_field
+#    already, and both Datamats must have key_field.
+#
+#    The new field in the target Datamat will be a masked array to handle
+#    non-existent data.
+#
+#    Examples:
+#        TODO: Make example more generic, remove interoceptive reference
+#        TODO: Make stand-alone test
+#
+#    >> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
+#    >> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
+#    >> length(dm_intero)
+#    4
+#    >> unique(dm_intero.subject_id)
+#    ['p05', 'p06']
+#    >> length(dm_emotiv)
+#    3
+#    >> unique(dm_emotiv.subject_id)
+#    ['p04', 'p05', 'p06']
+#    >> 'interospective_awareness' in dm_intero.fieldnames()
+#    True
+#    >> unique(dm_intero.interospective_awareness) == [0.5555, 0.6666]
+#    True
+#    >> 'interospective_awareness' in dm_emotiv.fieldnames()
+#    False
+#    >> dm_emotiv.annotate(dm_intero, 'interospective_awareness', 'subject_id')
+#    >> 'interospective_awareness' in dm_emotiv.fieldnames()
+#    True
+#    >> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
+#    False
+#    """
+#    raise NotImplementedError()
+#
+#    if key_field not in dm_l._fields or key_field not in dm_r._fields:
+#        raise AttributeError('key field (%s) must exist in both Datamats'%(
+#                            key_field))
+#    if data_field not in dm_r._fields:
+#        raise AttributeError('data field (%s) must exist in left Datamat' % (
+#                            data_field))
+#    if data_field in dm_r._fields:
+#        raise AttributeError('data field (%s) already exists in right Datamat' % (
+#                            data_field))
+#    if len(dm_l.field(key_field)) != len(np.unique(dm_l.field(key_field))):
+#        raise AttributeError('non-unique elements exist in left DataMat for key field (%s)' % (
+#                            key_field))
+#    if len(dm_r.field(key_field)) != len(np.unique(dm_r.field(key_field))):
+#        raise AttributeError('non-unique elements exist in right DataMat for key field (%s)' % (
+#                            key_field))
+#
+#    #Create a mapping of key_field value to data value.
+#    data_to_copy = dict([(x.field(key_field)[0], x.field(data_field)) for x in src_dm.by_field(key_field)])
+#
+#    data_element = data_to_copy.values()[0]
+#
+#    #Create the new data array of correct size.
+#    # We use a masked array because it is possible that for some elements
+#    # of the target Datamat, there exist simply no data in the source
+#    # Datamat. NaNs are fine as indication of this for floats, but if the
+#    # field happens to hold booleans or integers or something else, NaN
+#    # does not work.
+#    new_shape = [len(self)] + list(data_element.shape)
+#    new_data = ma.empty(new_shape, data_element.dtype)
+#    new_data.mask=True
+#    if np.issubdtype(new_data.dtype, np.float):
+#        new_data.fill(np.NaN) #For backwards compatibility, if mask not used
+#
+#    #Now we copy the data. If the data to copy contains only a single value,
+#    # it is added to the target as a scalar (single value).
+#    # Otherwise, it is copied as is, i.e. as a sequence.
+#    for (key, val) in data_to_copy.iteritems():
+#        new_data[self.field(key_field) == key] = val[0]
+#
+#    self.add_field(data_field, new_data)
+
+def flatten(dm):
+    """
+    Takes a DataMat who's elements are arrays and flattens it so that
+    the DataMat element is the lowest atom of data. Makes DataMat
+    potentially extremely long, but eases merging, aligning, and maybe
+    also analysis.
+    """
+    tmfields = dm.time_based_fields
+    seqfields = []
+    dbg(2, 'will flatten DataMat with %d elements.' % (len(dm)))
+    for f in dm.fieldnames():
+        if (dm.__dict__[f].dtype == np.object) and isiterable(dm.__dict__[f][0]):
+            seqfields += [f]
+            dbg(3, "seqfield: %s, %s, %s" % (f, 
+                    type(dm.__dict__[f][0]),
+                    dm.__dict__[f][0].dtype))
+    
+    nelements = 0
+    for dmi in dm:
+        elementn = [len(dmi.field(f)[0]) for f in seqfields]
+        assert(all_same(elementn))
+        nelements += elementn[0]
+    dbg(2, 'flattened DataMat will contain %d elements' % (nelements))
+
+
 def load(path):
     """
     Load datamat at path.
@@ -593,7 +701,7 @@ def VectorFactory(fields, parameters={}):
     for the parameters.
     
     >>> new_dm = VectorFactory({'field1':ma.array([1,2,3,4]),\
-    		'field2':ma.array(['a','b','c','d'])},{'param1':'some parameter'})
+    'field2':ma.array(['a','b','c','d'])},{'param1':'some parameter'})
     >>> new_dm
     Datamat(4 elements)
     >>> print new_dm # doctest:+ELLIPSIS
