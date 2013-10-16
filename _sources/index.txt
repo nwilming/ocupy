@@ -10,14 +10,13 @@ Contents:
 
 .. toctree::
 	:maxdepth: 2
-        
-        datamat.txt	
+	
 	fixmat.txt
+	parallel.txt
 	stimuli.txt
 	loader.txt
 	measures.txt
-        bounds.txt    
-    	
+	
 Indices and tables
 ==================
 

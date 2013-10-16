@@ -8,7 +8,6 @@ import ocupy
 from ocupy import fixmat
 import spline_base
 import numpy as np
-from progressbar import ProgressBar, Percentage, Bar
 import functools  
 import simulator
 
@@ -81,14 +80,15 @@ class FixGen(AbstractSim):
             fm: ocupy.fixmat
                 The fixation data to replicate in fixmat format.
         """
-        if type(fm)==ocupy.fixmat.FixMat:
+        if type(fm)==ocupy.fixmat.FixMat or type(fm)==ocupy.datamat.Datamat:
             self.fm = fm
         else:
             raise TypeError("Not a valid argument, insert fixmat")
 
         self.nosamples = []
         
-    def initializeData(self, fit = None, full_H1=None, max_length = 40, in_deg = True):
+    def initializeData(self, fit = None, full_H1=None, max_length = 40,
+            in_deg = True):
         """
         Prepares the data to be replicated. Calculates the second-order length 
         and angle dependencies between saccades and stores them in a fitted 
@@ -153,8 +153,8 @@ class FixGen(AbstractSim):
         for i in range(len(self.probability_cumsum)):
             self.linind['self.probability_cumsum '+repr(i)] = np.linspace(0,1,min_distance[i])[0:-1]
         
-        for elem in ['self.firstLenAng_cumsum', 'self.trajLen_cumsum']:
-            self.linind[elem] = np.linspace(0, 1, 1/min((np.unique(eval(elem))-np.roll(np.unique(eval(elem)),1))[1:]))[0:-1]
+        for elem in [self.firstLenAng_cumsum, self.trajLen_cumsum]:
+            self.linind[elem] = np.linspace(0, 1, 1/min((np.unique((elem))-np.roll(np.unique((elem)),1))[1:]))[0:-1]
         
     def _calc_xy(self, (x, y), angle, length):
         """
@@ -550,7 +550,7 @@ def reshift(I):
     Parameters: 
         I : array or list or int or float
             Number or numbers that shall be reshifted.
-    
+    Farell, Ludwig, Ellis, and Gilchrist
     Returns:
         numpy.ndarray : Reshifted number or numbers as array
     """

@@ -82,7 +82,7 @@ def reshift(I):
         I = np.array(I)
     
     if type(I)==np.ndarray:
-        while(sum(I>180)>0 or sum(I<-180)>0):
+        while((I>180).sum()>0 or (I<-180).sum()>0):
             I[I>180] = I[I>180]-360
             I[I<-180] = I[I<-180]+360
 

@@ -9,6 +9,7 @@ import h5py
 from warnings import warn
 from utils import snip_string_middle, isiterable, all_same
 import inspect
+import numpy as np
 
 try:
     dbg_lvl# @UndefinedVariable
@@ -27,7 +28,6 @@ def dbg(lvl, msg):
 def set_dbg_lvl(new_dbg_lvl):
     global dbg_lvl
     dbg_lvl = new_dbg_lvl
-    print 'edfread.set_dbg_lvl(%d)'%(dbg_lvl)
 
 class Datamat(object):
     """
@@ -112,7 +112,9 @@ class Datamat(object):
         for field in tmp_fieldnames:
             value_str = '?'
             dat = self.__dict__[field]
-            if not dat.dtype == np.object:
+            if len(self) >= 100000:
+                value_str = 'N/A'
+            elif not dat.dtype == np.object:
                 unique_vals = np.unique(dat)
                 if len(unique_vals) > 5:
                     value_str = '%d unique'%(len(unique_vals))
@@ -129,7 +131,6 @@ class Datamat(object):
                     value_str = type(dat[0]).__name__
                 else:
                     value_str = str(dat[0].dtype)+' arrays'
-
             field_display_name = snip_string_middle(field, 20)
             desc += "%s | %s | %s | %s\n" % (field_display_name.rjust(20), 
                                     str(len(dat)).center(13),
@@ -231,6 +232,13 @@ class Datamat(object):
         for param in self.parameters():
             fm_group.attrs[param]=self.__dict__[param]
         f.close()
+    
+    def tohdf5(self, h5obj, name):
+        fm_group = h5obj.create_group(name)
+        for field in self.fieldnames():
+            fm_group.create_dataset(field, data = self.__dict__[field])
+        for param in self.parameters():
+            fm_group.attrs[param]=self.__dict__[param]
 
                 
     def fieldnames(self):
@@ -247,6 +255,13 @@ class Datamat(object):
             i.e. values that are valid for the entire datamat.
         """
         return self._parameters
+
+    def set_param(self, key, value):
+        """
+        Set the value of a parameter.
+        """
+        self.__dict__[key] = value
+        self._parameters[key] = value
                             
     def by_field(self, field, return_overall_idx=False):
         """
@@ -470,13 +485,7 @@ class Datamat(object):
             This Datamat is added to the current one.
         """
         # Check if parameters are equal. If not, promote them to fields.
-        for (nm, val) in self._parameters.items():
-            if fm_new._parameters.has_key(nm):
-                if (val != fm_new._parameters[nm]):
-                    self.parameter_to_field(nm)
-                    fm_new.parameter_to_field(nm)
-            else:
-                self.parameter_to_field(nm)
+        '''
         for (nm, val) in fm_new._parameters.items():
             if self._parameters.has_key(nm):
                 if (val != self._parameters[nm]):
@@ -484,6 +493,7 @@ class Datamat(object):
                     fm_new.parameter_to_field(nm)
             else:
                 fm_new.parameter_to_field(nm)
+        '''
         # Deal with mismatch in the fields
         # First those in self that do not exist in new...
         orig_fields = self._fields[:]
@@ -498,7 +508,6 @@ class Datamat(object):
             if not field in self._fields:
                 fm_new.rm_field(field)
                 warn("field '%s' doesn't exist in source DataMat, removing." % field)
-
         # Concatenate fields
         for field in self._fields:
             self.__dict__[field] = ma.hstack((self.__dict__[field], 
@@ -685,21 +694,32 @@ def load(path):
             Absolute path of the file to load from.
     """
     f = h5py.File(path,'r')
-    fm_group = f['Datamat']
-    fields = {}
-    params = {}
-    for field, value in fm_group.iteritems():
-        fields[field] = ma.array(value)
-    for param, value in fm_group.attrs.iteritems():
-        params[param] = value
+    dm = fromhdf5(f['Datamat'])
     f.close()
-    return VectorFactory(fields, params)
+    return dm
 
+def fromhdf5(fm_group):
+    dm = {}
+    params = {}
+    for key, value in fm_group.iteritems():
+        dm[key] = value
+    for key, value in fm_group.attrs.iteritems():
+        params[key] = value
+    return VectorFactory(dm, params)
+ 
 def VectorFactory(fields, parameters={}):
     """
     Creates a new DataMat based on 2 dictionaries: one for the fields and one
     for the parameters.
     
+    Input:
+        fields: Dictionary
+            The values will be used as fields of the datamat and the keys
+            as field names.
+        parameters: Dictionary
+            A dictionary whose values are added as parameters. Keys are used
+            for parameter names.
+
     >>> new_dm = VectorFactory({'field1':ma.array([1,2,3,4]),\
     'field2':ma.array(['a','b','c','d'])},{'param1':'some parameter'})
     >>> new_dm
@@ -721,17 +741,75 @@ def VectorFactory(fields, parameters={}):
     Datamat(4 elements)
     
     TODO: convert fields into arrays.
-    
     """ 
     fm = Datamat()
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
-        fm.__dict__[field] = value 
+        fm.__dict__[field] = np.asarray(value)
     fm._parameters = parameters
     for (field, value) in parameters.iteritems(): 
         fm.__dict__[field] = value
     fm._num_fix = len(fm.__dict__[fields.keys()[0]])
     return fm
+
+class AccumulatorFactory(object):
+    
+    def __init__(self):
+        self.d = {}
+
+    def update(self, a):
+        if len(self.d.keys()) == 0:
+            self.d = dict((k,[v]) for k,v in a.iteritems())
+        else:
+            # For all fields in a that are also in dict
+            all_keys = set(a.keys() + self.d.keys())
+            for key in all_keys:
+                if key in a.keys():
+                    value = a[key]
+                if not key in self.d.keys():
+                    # key is not yet in d. add it
+                    self.d[key] = [np.nan]*len(self.d[self.d.keys()[0]])
+                if not key in a.keys():
+                    # key is not in new data. value should be nan
+                    value = np.nan
+                self.d[key].extend([value])                
+    
+    def get_dm(self, params = None):
+        if params is None:
+            params = {}
+        return VectorFactory(self.d, params)
+
+class DatamatAccumulator(object):
+    def __init__(self):
+        self.l = []
+
+    def update(self, dm):
+        self.l.append(dm.copy())
+
+    def get_dm(self):
+        # More efficient join
+        length=0
+        names = set(self.l[0].fieldnames())
+        for d in self.l:
+            length += len(d)
+            names = names.intersection(d.fieldnames())
+        dm_all = self.l[0].copy()
+        dm_all._num_fix = length
+        for f in names:
+            dm_all.rm_field(f)
+            dm_all.add_field(f, np.ones((length,)))
+            offset = 0
+            for d in self.l:
+                val = d.field(f)
+                dm_all.field(f)[offset:offset+len(d)] = val
+                offset = offset+len(d)
+        return dm_all
+                
+
+def DatamatFromRecordArray(arr):
+    d = dict((k, arr[k][0][0].flatten()) for k in arr.dtype.fields)
+    return VectorFactory(d,{})
+
 
 if __name__ == "__main__":
 

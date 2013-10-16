@@ -86,11 +86,14 @@ if have_image_library:
         return fromimage(img)
 
     
-def randsample(vec, nr_samples):
+def randsample(vec, nr_samples, with_replacement = False):
     """
     Draws nr_samples random samples from vec.
     """
-    return np.random.permutation(vec)[0:nr_samples]
+    if not with_replacement:
+        return np.random.permutation(vec)[0:nr_samples]
+    else:
+        return np.asarray(vec)[np.random.randint(0, len(vec), nr_samples)]
 
 def ismember(ar1, ar2): 
     """ 

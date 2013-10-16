@@ -249,7 +249,7 @@ def relative_bias(fm,  scale_factor = 1, estimator = None):
     return hist
      
                                              
-def DirectoryFixmatFactory(directory, categories = None, glob_str = '*.mat'):
+def DirectoryFixmatFactory(directory, categories = None, glob_str = '*.mat', var_name = 'fixmat'):
     """
     Concatenates all fixmats in dir and returns the resulting single
     fixmat.
@@ -261,7 +261,9 @@ def DirectoryFixmatFactory(directory, categories = None, glob_str = '*.mat'):
             If given, the resulting fixmat provides direct access
             to the data in the categories object.
         glob_str : string
-            A regular expression that defines which mat files are picked up
+            A regular expression that defines which mat files are picked up.
+        var_name : string
+            The variable to load from the mat file.
     Returns:
         f_all : instance of FixMat
             Contains all fixmats that were found in given directory
@@ -271,14 +273,14 @@ def DirectoryFixmatFactory(directory, categories = None, glob_str = '*.mat'):
     if len(files) == 0:
         raise ValueError("Could not find any fixmats in " + 
             join(directory, glob_str))
-    f_all = FixmatFactory(files.pop(), categories)
+    f_all = FixmatFactory(files.pop(), categories, var_name)
     for fname in files:
-        f_current = FixmatFactory(fname, categories)
+        f_current = FixmatFactory(fname, categories, var_name)
         f_all.join(f_current)
     return f_all
 
 
-def FixmatFactory(fixmatfile, categories = None):
+def FixmatFactory(fixmatfile, categories = None, var_name = 'fixmat'):
     """
     Loads a single fixmat (fixmatfile).
     
@@ -288,7 +290,7 @@ def FixmatFactory(fixmatfile, categories = None):
         categories : instance of stimuli.Categories, optional
             Links data in categories to data in fixmat.
     """
-    data = loadmat(fixmatfile, struct_as_record = False)['fixmat'][0][0]
+    data = loadmat(fixmatfile, struct_as_record = False)[var_name][0][0]
     num_fix = data.x.size
     
     # Get a list with fieldnames and a list with parameters

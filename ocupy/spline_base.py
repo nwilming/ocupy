@@ -185,7 +185,7 @@ def spline_base1d(length, nr_knots = 20, spline_order = 5, marginal = None):
             knots are equally spaced.
     """
     if marginal is None:
-        knots = augknt(np.linspace(0,length, nr_knots), spline_order)
+        knots = augknt(np.linspace(0,length+1, nr_knots), spline_order)
     else:
         knots = knots_from_marginal(marginal, nr_knots, spline_order)
         
@@ -231,11 +231,11 @@ def spline_base2d(width, height, nr_knots_x = 20.0, nr_knots_y = 20.0,
     if not (nr_knots_x<width and nr_knots_y<height):
         raise RuntimeError("Too many knots for size of the base")
     if marginal_x is None:
-        knots_x         = augknt(np.linspace(0,width,nr_knots_x), spline_order)
+        knots_x         = augknt(np.linspace(0,width+1,nr_knots_x), spline_order)
     else:
         knots_x = knots_from_marginal(marginal_x, nr_knots_x, spline_order) 
     if marginal_y is None:
-        knots_y         = augknt(np.linspace(0,height, nr_knots_y), spline_order)
+        knots_y         = augknt(np.linspace(0,height+1, nr_knots_y), spline_order)
     else:
         knots_y = knots_from_marginal(marginal_y, nr_knots_y, spline_order)
     x_eval = np.arange(1,width+1).astype(float)
@@ -270,7 +270,7 @@ def spline_base3d( width, height, depth, nr_knots_x = 10.0, nr_knots_y = 10.0,
     if marginal_z is not None:
         knots_z = knots_from_marginal(marginal_z, nr_knots_z, spline_order)
     else:
-        knots_z = augknt(np.linspace(0,depth, nr_knots_z), spline_order)
+        knots_z = augknt(np.linspace(0,depth+1, nr_knots_z), spline_order)
     z_eval = np.arange(1,depth+1).astype(float)
     spline_setz = spcol(z_eval, knots_z, spline_order)
     bspline = np.zeros((basis2d.shape[0]*len(z_eval), height*width*depth))
@@ -326,7 +326,7 @@ def N(u,i,p,knots):
     at knot i and point u.
     """
     if p == 0:
-        if knots[i] < u and u <=knots[i+1]:
+        if knots[i] <= u and u < knots[i+1]:
             return 1.0
         else:
             return 0.0
