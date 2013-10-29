@@ -344,7 +344,7 @@ def faster_roc(actuals, controls):
     # (add the missing triangle)
     if false_pos_rate[-2] == 1:
         auc += ((1-true_pos_rate[-3])*.5*(1-false_pos_rate[-3]))
-    return (auc, true_pos_rate, false_pos_rate, actuals, controls, thresholds)
+    return (auc, true_pos_rate, false_pos_rate)
 
 def exact_roc(actuals, controls):
     """
