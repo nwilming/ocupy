@@ -562,7 +562,7 @@ def VectorFactory(fields, parameters, categories = None):
     fm = Datamat(categories = categories)
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
-        fm.__dict__[field] = np.asarray(value)
+        fm.__dict__[field] = np.asanyarray(value)
     fm._parameters = parameters
     for (field, value) in parameters.iteritems(): 
        fm.__dict__[field] = value
