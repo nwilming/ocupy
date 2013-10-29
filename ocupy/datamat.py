@@ -737,13 +737,11 @@ def VectorFactory(fields, parameters={}):
     >>> new_dm = VectorFactory({'field1':ma.array([1,2,3,4])})
     >>> new_dm
     Datamat(4 elements)
-    
-    TODO: convert fields into arrays.
     """ 
     fm = Datamat()
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
-        fm.__dict__[field] = np.asarray(value)
+        fm.__dict__[field] = np.asanyarray(value)
     fm._parameters = parameters
     for (field, value) in parameters.iteritems(): 
         fm.__dict__[field] = value
