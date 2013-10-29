@@ -7,7 +7,7 @@ import numpy as np
 from numpy import ma
 import h5py
 from warnings import warn
-from utils import snip_string_middle, isiterable, all_same
+from utils import snip_string_middle, isiterable, all_same, ma_nans
 import inspect
 
 try:
@@ -196,13 +196,25 @@ class Datamat(object):
         """
         return self.filter(np.ones(self._num_fix).astype(bool))
 
+    def copy_empty(self):
+        """
+        Returns a copy of the datamat, but without data fields.
+        Will preserve the type and parameters of the DataMat but with
+        no fields.
+        """
+        newdm = self.filter([0])
+        #We must iterate backwards because we are removing elements.
+        for f in reversed(newdm.fieldnames()):
+            newdm.rm_field(f)
+        newdm._num_fix = 0
+        return newdm
 
     def field(self, fieldname):
         """
         Return field fieldname. fm.field('x') is equivalent to fm.x.
         
         The '.' form (fm.x) is always easier in interactive use, but
-        programmatically, this function can be useful if one has the field
+        programmatically, this function is necessary if one has the field
         name in a variable.
 
         Parameters:
@@ -425,6 +437,13 @@ class Datamat(object):
         self._fields.remove(name)
         del self.__dict__[name]
 
+    def rename_field(self, field, new_name):
+        """
+        Simply renames a field of the Datamat.
+        """
+        self.__dict__[new_name] = self.__dict__.pop(field)
+        self._fields[self._fields.index(field)] = new_name
+
     def add_parameter(self, name, value):
         """
         Adds a parameter to the existing Datamat.
@@ -468,6 +487,53 @@ class Datamat(object):
         self.rm_parameter(name)
         self.add_field(name, data)
         
+    def add_average_field(self,
+                          field_to_avg,
+                          average_func=np.ma.mean,
+                          valid_range=None #[20, 300]
+                          ):
+        """
+        Will run an function over the elements of a field to reduce them
+        to a single metric for each element, and add this reduced data (e.g.
+        the mean value) as a new field to the DataMat.
+        
+        Obvious example is to compute the average pupil size in a single trial.
+        
+        Parameters:
+         field_to_avg : string
+             the name of the field to process
+         average_func : function pointer
+             a pointer to the function to use for each element
+         valid_range : 2-element sequence (tuple or list)
+             if not None, then minimum and maximum dictating the
+             range, outside of which the data will be ignored. The data outside
+             this range will be masked prior to the averaging.
+        
+        """
+        for fieldname in [field_to_avg]:
+            if fieldname not in self.fieldnames():
+                raise ValueError("Required field '%s' not in Datamat." % (
+                            fieldname))
+        avg = []
+        for dmi in self:
+            dat = dmi.field(field_to_avg)[0]
+            if dat is not None:
+                spandat = dat[dmi.span_start_idx[0]:dmi.span_end_idx[0]]
+                if valid_range is not None:
+                    valdat = spandat[(spandat > valid_range[0]) & (spandat < valid_range[1])]
+                else:
+                    valdat = spandat
+                datavg = average_func(valdat) if len(valdat) > 0 else np.NaN
+                avg.append(datavg)
+            else:
+                avg.append(np.NaN)
+
+        avg = ma.masked_invalid(avg)
+        avg.fill_value = np.NaN
+        new_field = (average_func.__name__) + "_" + field_to_avg
+
+        self.add_field(new_field, avg)
+
     def join(self, fm_new):
         """
         Adds content of a new Datamat to this Datamat, assuming same fields.
@@ -660,28 +726,84 @@ class Datamat(object):
 
 def flatten(dm):
     """
-    Takes a DataMat who's elements are arrays and flattens it so that
-    the DataMat element is the lowest atom of data. Makes DataMat
-    potentially extremely long, but eases merging, aligning, and maybe
-    also analysis.
+    Takes a DataMat who's elements are arrays and returns a flattened copy
+    in which the DataMat element is the lowest atom of data: so no DataMat
+    element contains time-indexed fields: all the time points are directly,
+    flatly, accessible.
+    Makes DataMat potentially extremely long, but eases merging, aligning, 
+    and maybe also analysis.
     """
     tmfields = dm.time_based_fields
     seqfields = []
     dbg(2, 'will flatten DataMat with %d elements.' % (len(dm)))
+    #Step 1. Determine which fields need flattening.
+    # TODO: a better test for the sequence fields is needed here.
     for f in dm.fieldnames():
         if (dm.__dict__[f].dtype == np.object) and isiterable(dm.__dict__[f][0]):
             seqfields += [f]
             dbg(3, "seqfield: %s, %s, %s" % (f, 
                     type(dm.__dict__[f][0]),
                     dm.__dict__[f][0].dtype))
-    
-    nelements = 0
+
+    #Step 2. Determine the amount of elements in the fields to be flattened.
+    nelements = []
     for dmi in dm:
         elementn = [len(dmi.field(f)[0]) for f in seqfields]
         assert(all_same(elementn))
-        nelements += elementn[0]
-    dbg(2, 'flattened DataMat will contain %d elements' % (nelements))
+        nelements += [elementn[0]]
+    dbg(2, 'flattened DataMat will contain %d elements' % (sum(nelements)))
 
+    newdm = dm.copy_empty()
+    newdm._num_fix = sum(nelements)
+
+    nonseqfields = set(seqfields).symmetric_difference(set(dm.fieldnames()))
+    newdata = {}
+    newmask = {}
+    #Step 3. Create new, empty, arrays for each of the non-sequence fields.
+    for f in nonseqfields:
+        dbg(3, "creating empty non-seq field '%s'" % (f))
+        #to avoid problems with uninitialised values, use ma_nans instead of
+        # ma.empty(sum(nelements), dtype=dm.field(f).dtype)
+        if isiterable(dm.field(f)[0]):
+            fdtype = np.object
+        else:
+            fdtype = dm.field(f).dtype
+
+        newdata[f] = ma_nans(sum(nelements)).astype(fdtype)
+
+    #Step 4. Expand all non-sequence fields into the new empty arrays.
+    sidx = 0
+    for idx, dmi in enumerate(dm):
+        eidx = sidx + nelements[idx]
+        dbg(4, '%d,%d' % (sidx, eidx))
+        for f in nonseqfields:
+            dbg(3, "element %d/%d: filling non-seq field '%s' [%d:%d] (%s)" % (idx,
+                    len(dm),
+                    f,
+                    sidx, eidx,
+                    str(dmi.field(f)[0])))
+            if isiterable(dmi.field(f)[0]):
+                for ii in xrange(sidx, eidx):
+                    newdata[f][ii] = \
+                        dmi.field(f)[0].astype(np.object)
+            else:
+                newdata[f][sidx:eidx] = dmi.field(f)[0]
+        sidx = eidx
+
+
+    #Step 5. Stack all the sequence fields together.
+    for f in seqfields:
+        dbg(3, "stacking sequence field '%s'" % (f))
+        newdata[f] = np.hstack(dm.field(f))
+        newmask[f] = np.hstack(np.ma.getmaskarray(dm.field(f)))
+        dbg(4, 'newmask[%s]: %s' % (f, newmask[f]))
+        warn('todo: set mask correctly')
+
+    #Step 6. Create the new DataMat
+    for k, v in newdata.iteritems():
+        newdm.add_field(k, v)
+
+    return newdm #newdata, newmask
 
 def load(path):
     """
@@ -768,7 +890,7 @@ class AccumulatorFactory(object):
                 if not key in a.keys():
                     # key is not in new data. value should be nan
                     value = np.nan
-                self.d[key].extend([value])                
+                self.d[key].extend([value])
     
     def get_dm(self, params = None):
         if params is None:

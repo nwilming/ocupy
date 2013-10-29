@@ -39,11 +39,25 @@ def all_same(items):
        >>> all_same([1])
        True
 
-       ?TODO>>> all_same([])
+       >>> all_same([])
        True
 
        """
     return items is None or list(items).count(items[0]) == len(items)
+
+def ma_nans(shape):
+    """
+    Use instead of ma.masked_all().
+    Returns a completely masked array whose underlying data is all NaNs.
+
+    ma.masked_all creates an uninitialized array (with np.empty) which can
+    cause warnings and worse in later code if arithmetic is attempted on the
+    array, even if it is masked.
+    """
+    aa = np.ma.ones(shape) * np.nan
+    aa.set_fill_value(np.nan)
+    aa.mask = True
+    return aa
 
 if have_image_library:
     def imresize(arr, newsize, interp='bicubic', mode=None):
