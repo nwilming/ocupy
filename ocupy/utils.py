@@ -4,6 +4,7 @@
 from numpy import asarray, ma
 import numpy as np
 import cPickle
+import os
 
 have_image_library=True
 try:
@@ -39,7 +40,7 @@ def all_same(items):
        >>> all_same([1])
        True
 
-       >>> all_same([])
+       >> all_same([])
        True
 
        """
@@ -468,6 +469,30 @@ def pad_vector(data, center, window, pad_element=np.NaN):
 
     return out
 
+def align_vector(src, onset_src, onset_dst, len_dst,
+                 pad_element=np.nan):
+    """
+    This is essentially a wrapper around pad_vector() tailored to the use-case
+    for assimilating data from one hierarchical DataMat into another: that is,
+    when two DataMats both contain time-indexed fields (multiple elements) and
+    so for each element, the source element array must be aligned to the
+    destination element array.
+    
+    >>> aa = align_vector([1, 2, 3, 4], 0, 2, 8)
+    >>> print aa
+    [nan, nan, 1.0, 2.0, 3.0, 4.0, nan, nan]
+    
+    >>> aa = align_vector(ma.array([1, 2, 3, 4]), 0, 2, 8)
+    >>> print aa
+    [-- -- 1.0 2.0 3.0 4.0 -- --]
+    
+    >>> align_vector([8, 7, 6, 5, 4, 3, 2, 1, 0, -1, -2, -3], 4, 2, 8, -99)
+    [6, 5, 4, 3, 2, 1, 0, -1]
+    
+    """
+    return pad_vector(src, onset_src, [-onset_dst, len_dst - onset_dst],
+                      pad_element)
+
 def expand_boolean_subindex(overall_idx, subidx):
     """
     subidx is a boolean index referencing a subset of an array that is the length
@@ -501,6 +526,63 @@ def expand_boolean_subindex(overall_idx, subidx):
     ei[false_positions] = False
     
     return ei
+
+def factorise_field(dm, field_name, boundary_char=None, parameter_name=None):
+    """This removes a common beginning from the data of the fields, placing
+    the common element in a parameter and the different endings in the fields.
+    
+    if parameter_name is None, then it will be <field_name>_common.
+    
+    So far, it's probably only useful for the file_name.
+    
+    NB: this modifies the DataMat!
+    
+    TODO: remove field entirely if no unique elements exist.
+    """
+
+    old_data = dm.field(field_name)
+
+    if isinstance(old_data[0], str) or isinstance(old_data[0], unicode):
+        (new_data, common) = factorise_strings(old_data, boundary_char)
+        new_data = np.array(new_data)
+    else:
+        raise NotImplementedError('factorising of fields not implemented for anything but string/unicode objects')
+
+    if len(common) > 0:
+        dm.__dict__[field_name] = new_data
+        if parameter_name is None:
+            parameter_name = field_name + '_common'
+        dm.add_parameter(parameter_name, common)
+
+def get_file_name(dm,
+                  fname_field='file_name',
+                  fpath_param='file_path'):
+    """
+    Convenience function to get the filename of a particular DataMat,
+    which is potentially stored in a combination of parameter and field,
+    as done with factorise_field.
+    
+    Will return the file_name of the first element in the DataMat.
+    
+    The names of the variables are not very strict, which is silly:
+    this function will return the entire path of the file from which the
+    first element of the DataMat came. This is composed of the 'file_path'
+    and the 'file_name' which should actually be called something like 
+    'file_dir' and 'file_fname' respectively. Oh well.
+    
+    """
+    fname = None
+    if fname_field in dm.fieldnames():
+        if fpath_param in dm.parameters():
+            fname = os.path.join(dm.parameter(fpath_param), dm.field(fname_field)[0])
+        else:
+            fname = dm.field(fname_field)[0]
+    else:
+        #ok, no field, must be only param
+        if fname_field in dm.parameters():
+            fname = dm.parameter(fname_field)
+    
+    return fname
 
 if __name__ == '__main__':
     import doctest

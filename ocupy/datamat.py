@@ -12,6 +12,7 @@ import inspect
 
 try:
     dbg_lvl# @UndefinedVariable
+    #print '%s.dbg_lvl == %d' % ('ocupy.datamat', dbg_lvl)
 except NameError:
     dbg_lvl = 0
 
@@ -272,7 +273,7 @@ class Datamat(object):
         """
         self.__dict__[key] = value
         self._parameters[key] = value
-                            
+
     def by_field(self, field, return_overall_idx=False):
         """
         Returns an iterator that iterates over unique values of field
@@ -386,7 +387,6 @@ class Datamat(object):
         >> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
         False
         """
-        #warn(DeprecationWarning('Use datamat.merge() instead.'))
         if key_field not in self._fields or key_field not in src_dm._fields:
             raise AttributeError('key field (%s) must exist in both Datamats'%(key_field))
         if data_field not in src_dm._fields:
@@ -499,6 +499,8 @@ class Datamat(object):
         
         Obvious example is to compute the average pupil size in a single trial.
         
+        Will honor span start and end indices if they are not masked. 
+        
         Parameters:
          field_to_avg : string
              the name of the field to process
@@ -518,7 +520,13 @@ class Datamat(object):
         for dmi in self:
             dat = dmi.field(field_to_avg)[0]
             if dat is not None:
-                spandat = dat[dmi.span_start_idx[0]:dmi.span_end_idx[0]]
+                sidx = dmi.span_start_idx[0]
+                if ma.is_masked(sidx):
+                    sidx = 0
+                eidx = dmi.span_end_idx[0]
+                if ma.is_masked(eidx):
+                    eidx = -1
+                spandat = dat[sidx:eidx]
                 if valid_range is not None:
                     valdat = spandat[(spandat > valid_range[0]) & (spandat < valid_range[1])]
                 else:
@@ -530,7 +538,8 @@ class Datamat(object):
 
         avg = ma.masked_invalid(avg)
         avg.fill_value = np.NaN
-        new_field = (average_func.__name__) + "_" + field_to_avg
+        fname = get_short_function_name(average_func)
+        new_field = (fname) + "_" + field_to_avg
 
         self.add_field(new_field, avg)
 
@@ -723,6 +732,19 @@ class Datamat(object):
 #        new_data[self.field(key_field) == key] = val[0]
 #
 #    self.add_field(data_field, new_data)
+
+def  get_short_function_name(func):
+    """
+    Bit of a kludge, to allow automatic determination of field name
+    for the add_average_field() func: simply makes a human-friendly name
+    from the function name.
+    """
+    fname = func.__name__
+    if fname.startswith('nan'):
+        sname = fname[3:]
+    else:
+        sname = fname
+    return sname
 
 def flatten(dm):
     """
