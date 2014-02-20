@@ -5,7 +5,6 @@ blocks (i.e. eye-tracking data.)
 """
 import numpy as np
 from numpy import ma
-import h5py
 from warnings import warn
 from utils import snip_string_middle, isiterable, all_same, ma_nans
 import inspect
@@ -236,6 +235,7 @@ class Datamat(object):
             path : string   
                 Absolute path of the file to save to.
         """
+        import h5py
         f = h5py.File(path, 'w')
         fm_group = f.create_group('Datamat')
         for field in self.fieldnames():
@@ -835,6 +835,7 @@ def load(path):
         path : string
             Absolute path of the file to load from.
     """
+    import h5py
     f = h5py.File(path,'r')
     dm = fromhdf5(f['Datamat'])
     f.close()
