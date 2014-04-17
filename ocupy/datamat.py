@@ -12,9 +12,9 @@ class Datamat(object):
     Represents grouped data.
 
     The datamat holds, filters and stores attributes that are grouped by some 
-		event. For example, a group could be a trial in an experiment. The 
-		attributes of this group might be associated with the subject's name or a
-		trial condition.
+		event. For example, a group could be a trial in an experiment. 
+                The attributes of this group might be associated with the 
+                subject's name or a trial condition.
      
     A datamat consists of lists called 'fields' which represent the raw
     underlying data and its attributes.

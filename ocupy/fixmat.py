@@ -280,7 +280,7 @@ def DirectoryFixmatFactory(directory, categories = None, glob_str = '*.mat', var
     return f_all
 
 
-def FixmatFactory(fixmatfile, categories = None, var_name = 'fixmat'):
+def FixmatFactory(fixmatfile, categories = None, var_name = 'fixmat', field_name='x'):
     """
     Loads a single fixmat (fixmatfile).
     
@@ -290,8 +290,15 @@ def FixmatFactory(fixmatfile, categories = None, var_name = 'fixmat'):
         categories : instance of stimuli.Categories, optional
             Links data in categories to data in fixmat.
     """
-    data = loadmat(fixmatfile, struct_as_record = False)[var_name][0][0]
-    num_fix = data.x.size
+    try:
+        data = loadmat(fixmatfile, struct_as_record = False)
+        keys = data.keys()
+        data = data[var_name][0][0]
+    except KeyError:
+        raise RuntimeError('%s is not a field of the matlab structure. Possible'+
+                'Keys are %s'%str(keys))
+    
+    num_fix = data.__getattribute__(field_name).size
     
     # Get a list with fieldnames and a list with parameters
     fields = {}
