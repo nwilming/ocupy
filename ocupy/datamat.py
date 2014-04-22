@@ -1,20 +1,40 @@
 #!/usr/bin/env python
-"""This module implements the Datamat Structure for managing data structured in blocks (i.e. eye-tracking data.)"""
-import warnings
+"""
+This module implements the Datamat Structure for managing data structured in 
+blocks (i.e. eye-tracking data.)
+"""
 import numpy as np
-from utils import snip_string_middle, isiterable
-import h5py
 from numpy import ma
+from warnings import warn
+from utils import snip_string_middle, isiterable, all_same, ma_nans
+import inspect
 
+try:
+    dbg_lvl# @UndefinedVariable
+    #print '%s.dbg_lvl == %d' % ('ocupy.datamat', dbg_lvl)
+except NameError:
+    dbg_lvl = 0
+
+def dbg(lvl, msg):
+    if lvl <= dbg_lvl:
+        if lvl == 0:
+            print '%s'%msg
+        else:
+            caller_name = inspect.stack()[1][3]
+            print('dbg(%d|%s): %s'%(lvl, caller_name, msg))
+
+def set_dbg_lvl(new_dbg_lvl):
+    global dbg_lvl
+    dbg_lvl = new_dbg_lvl
 
 class Datamat(object):
     """
     Represents grouped data.
 
     The datamat holds, filters and stores attributes that are grouped by some 
-		event. For example, a group could be a trial in an experiment. 
-                The attributes of this group might be associated with the 
-                subject's name or a trial condition.
+    event. For example, a group could be a trial in an experiment. The 
+    attributes of this group might be associated with the subject's name or a
+    trial condition.
      
     A datamat consists of lists called 'fields' which represent the raw
     underlying data and its attributes.
@@ -27,19 +47,17 @@ class Datamat(object):
     datamat.y    # Returns a list of y-coordinates
 
     In this case a single index into any one of these lists represents a 
-    fixation:
+    fixation.
 
     .. note:: It is never necessary to create a Datamat object directly. 
         This is handled by Datamat factories.
     """ 
     
-    def __init__(self, categories = None, datamat = None, index = None):
+    def __init__(self, datamat = None, index = None):
         """
         Creates a new Datamat from an existing one
 
         Parameters:
-            categories : optional, instance of stimuli.Categories,
-                allows direct access to image data via the Datamat
             datamat : instance of datamat.Datamat, optional
                 if given, the existing Datamat is copied and only those fixations
                 that are marked True in index are retained.
@@ -50,19 +68,22 @@ class Datamat(object):
                 that a datamat always holds arrays, never scalar values, as fields.
 
         TODO: thoroughly test that all indices work as expected (including slicing etc)
+
+
+        The indexing of a DataMat is achieved with the same semantics as the indexing
+        of a numpy array. That is, fancy indexing returns a copy of the fields, whereas
+        other types of indexing such as slicing will return views. This is potentially
+        tricky because all parameters will always be copies.
+        
+        NB: because of this usage of the constructor to filter also,
+        and because of the non-intuitive self object in Python, and because of
+        Python's multiple inheritance, sub-classing Datamat is a royal PITA.
         """
         
         self._fields = []
-        self._categories = categories
         self._parameters = {}
         self._num_fix = 0
-        #warn('this needs to be thoroughly tested for indexes that are not boolean NumPy arrays!')
         if datamat is not None and index is not None:
-            #index = index.reshape(-1,).astype(bool)
-            #assert index.shape[0] == datamat._num_fix, ("Index vector for " +
-            #    "filtering has to have the same length as the fields of the Datamat")
-            #TODO: check this for slicing operations (fields will be views
-            #rather than separate objects.
             if not isiterable(index):
                 index = [index]
             self._fields = datamat._fields[:]
@@ -82,9 +103,9 @@ class Datamat(object):
         return 'Datamat(%i elements)' % (len(self))
 
     def __str__(self):
-        desc = "Datamat with %i datapoints and the following data fields:\n" % (
+        desc = "Datamat with %i elements and the following data fields:\n" % (
                                                                     len(self))
-        desc += "%s | %s | %s | %s \n" % ('Field Name'.rjust(20),
+        desc += "%s | %s | %s | %s\n" % ('Field Name'.rjust(20),
                                           'Length'.center(13), 
                                           'Type'.center(10), 
                                           'Values'.center(20))
@@ -93,22 +114,32 @@ class Datamat(object):
         tmp_fieldnames.sort()
         max_field_val_len = 40
         for field in tmp_fieldnames:
-            if not self.__dict__[field].dtype == np.object and len(self) < 100000:
-                num_uniques = np.unique(self.__dict__[field])
-                if len(num_uniques) > 5:
-                    num_uniques = '%d unique'%(len(num_uniques))
-                elif len(str(num_uniques)) > max_field_val_len:
-                    per_val_len = (max_field_val_len // len(num_uniques))-1
-                    if isinstance(num_uniques[0], str) or isinstance(num_uniques[0], unicode):
-                        num_uniques = np.array([snip_string_middle(str(el),per_val_len, '..') for el in num_uniques])
-            else:
-                num_uniques = 'N/A'
-            
+            value_str = '?'
+            dat = self.__dict__[field]
+            if len(self) >= 100000:
+                value_str = 'N/A'
+            elif not dat.dtype == np.object:
+                unique_vals = np.unique(dat)
+                if len(unique_vals) > 5:
+                    value_str = '%d unique'%(len(unique_vals))
+                elif len(str(unique_vals)) > max_field_val_len:
+                    per_val_len = (max_field_val_len // len(unique_vals))-1
+                    if isinstance(unique_vals[0], str) or isinstance(unique_vals[0], unicode):
+                        value_str = str(np.array([snip_string_middle(str(el),per_val_len, '..') for el in unique_vals]))
+                    else:
+                        value_str = snip_string_middle(str(unique_vals), max_field_val_len, '..')
+                else:
+                    value_str = str(unique_vals)
+            else: #object array
+                if not isinstance(dat[0], np.ndarray):
+                    value_str = type(dat[0]).__name__
+                else:
+                    value_str = str(dat[0].dtype)+' arrays'
             field_display_name = snip_string_middle(field, 20)
-            desc += "%s | %s | %s | %s \n" % (field_display_name.rjust(20), 
-                                    str(len(self.__dict__[field])).center(13),
-                                    str(self.__dict__[field].dtype).center(10),
-                                    str(num_uniques).center(20))
+            desc += "%s | %s | %s | %s\n" % (field_display_name.rjust(20), 
+                                    str(len(dat)).center(13),
+                                    str(dat.dtype).center(10),
+                                    str(value_str).center(20))
         desc += "---------------------+---------------+------------+----------------\n"
         desc += "%s | %s\n" % ('Parameter Name'.rjust(20), 'Value'.ljust(20))
         desc += "---------------------+---------------------------------------------\n"
@@ -117,7 +148,7 @@ class Datamat(object):
         max_param_val_len = 13 + 3 + 10 + 3 + 20
         for param in param_keys:
             param_display_name = snip_string_middle(param, 20)
-            desc += '%s | %s \n' % (param_display_name.rjust(20),
+            desc += '%s | %s\n' % (param_display_name.rjust(20),
                                     snip_string_middle(str(self.__dict__[param]), max_param_val_len))
         return desc
    
@@ -147,10 +178,10 @@ class Datamat(object):
         the array says False. The logical array can conveniently be created
         with numpy::
         
-            >>> print np.unique(fm.category)
-            np.array([2,9])
-            >>> fm_filtered = fm[ fm.category == 9 ]
-            >>> print np.unique(fm_filtered)
+          >> print np.unique(fm.category)
+          np.array([2,9])
+            >> fm_filtered = fm[ fm.category == 9 ]
+            >> print np.unique(fm_filtered)
             np.array([9])
     
         Parameters:
@@ -159,8 +190,11 @@ class Datamat(object):
                 passes the filter; else contains False
         Returns:
             datamat : Datamat Instance
+            
+            NB: rmuil: should be using type(self) so that subclasses can use this function
+            and don't get returned a bare Datamat. Tricky though.
         """
-        return Datamat(categories=self._categories, datamat=self, index=index)
+        return Datamat(datamat=self, index=index)
 
     def copy(self):
         """
@@ -168,13 +202,25 @@ class Datamat(object):
         """
         return self.filter(np.ones(self._num_fix).astype(bool))
 
+    def copy_empty(self):
+        """
+        Returns a copy of the datamat, but without data fields.
+        Will preserve the type and parameters of the DataMat but with
+        no fields.
+        """
+        newdm = self.filter([0])
+        #We must iterate backwards because we are removing elements.
+        for f in reversed(newdm.fieldnames()):
+            newdm.rm_field(f)
+        newdm._num_fix = 0
+        return newdm
 
     def field(self, fieldname):
         """
         Return field fieldname. fm.field('x') is equivalent to fm.x.
         
         The '.' form (fm.x) is always easier in interactive use, but
-        programmatically, this function can be useful if one has the field
+        programmatically, this function is necessary if one has the field
         name in a variable.
 
         Parameters:
@@ -195,6 +241,7 @@ class Datamat(object):
             path : string   
                 Absolute path of the file to save to.
         """
+        import h5py
         f = h5py.File(path, 'w')
         fm_group = f.create_group('Datamat')
         for field in self.fieldnames():
@@ -232,59 +279,33 @@ class Datamat(object):
         """
         self.__dict__[key] = value
         self._parameters[key] = value
-                            
-    def by_field(self, field):
+
+    def by_field(self, field, return_overall_idx=False):
         """
         Returns an iterator that iterates over unique values of field
         
         Parameters:
             field : string
                 Filters the datamat for every unique value in field and yields 
-                the filtered datamat.
+                the filtered datamat.\
+            return_overall_idx : boolean
+                If true, will also return the index used to get each filtered
+                DataMat, to determine where in the original DataMat the filtered
+                DataMats come from. Use `ocupy.utils.expand_boolean_subindex()`
+                to use this overall_idx.
         Returns:
             datamat : Datamat that is filtered according to one of the unique
                 values in 'field'.
+            overall_idx : boolean array - the index into the original DataMat
+                used to retrieve this DataMat (only returned if
+                 return_overall_idx==True)
         """
         for value in np.unique(self.__dict__[field]):
-            yield self.filter(self.__dict__[field] == value)
-
-    def by_cat(self): 
-        """
-        Iterates over categories and returns a filtered datamat. 
-        
-        If a categories object is attached, the images object for the given 
-        category is returned as well (else None is returned).
-        
-        Returns:
-            (datamat, categories) : A tuple that contains first the filtered
-                datamat (has only one category) and second the associated 
-                categories object (if it is available, None otherwise)
-        """
-        for value in np.unique(self.category):
-            cat_fm = self.filter(self.category == value) 
-            if self._categories:
-                yield (cat_fm, self._categories[value]) 
-            else: 
-                yield (cat_fm, None) 
-             
-    def by_filenumber(self): 
-        """
-        Iterates over categories and returns a filtered datamat. 
-        
-        If a categories object is attached, the images object for the given 
-        category is returned as well (else None is returned).
-        
-        Returns:
-            (datamat, categories) : A tuple that contains first the filtered
-                datamat (has only one category) and second the associated 
-                categories object (if it is available, None otherwise)
-        """
-        for value in np.unique(self.filenumber):
-            file_fm = self.filter(self.filenumber == value) 
-            if self._categories:
-                yield (file_fm, self._categories[self.category[0]][value]) 
-            else: 
-                yield (file_fm, None)        
+            overall_idx = self.__dict__[field] == value
+            if return_overall_idx:
+                yield (self.filter(overall_idx), overall_idx)
+            else:
+                yield self.filter(overall_idx)
     
     def add_field(self, name, data):
         """
@@ -319,15 +340,16 @@ class Datamat(object):
         new_data.mask = True
         self.add_field(name, new_data)
 
+
     def annotate (self, src_dm, data_field, key_field, take_first=True):
         """
         Adds a new field (data_field) to the Datamat with data from the
         corresponding field of another Datamat (src_dm).
         
-				This is accomplished through the use of a key_field, which is
+        This is accomplished through the use of a key_field, which is
         used to determine how the data is copied.
         
-				This operation corresponds loosely to an SQL join operation.
+        This operation corresponds loosely to an SQL join operation.
 
         The two Datamats are essentially aligned by the unique values
         of key_field so that each block element of the new field of the target
@@ -344,31 +366,31 @@ class Datamat(object):
         
         The new field in the target Datamat will be a masked array to handle
         non-existent data.
-       	
-				TODO: Make example more generic, remove interoceptive reference
-				TODO: Make standalone test
-        Examples:
         
-        >>> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
-        >>> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
-        >>> length(dm_intero)
+        Examples:
+            TODO: Make example more generic, remove interoceptive reference
+            TODO: Make stand-alone test
+        
+        >> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
+        >> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
+        >> length(dm_intero)
         4
-        >>> unique(dm_intero.subject_id)
+        >> unique(dm_intero.subject_id)
         ['p05', 'p06']
-        >>> length(dm_emotiv)
+        >> length(dm_emotiv)
         3
-        >>> unique(dm_emotiv.subject_id)
+        >> unique(dm_emotiv.subject_id)
         ['p04', 'p05', 'p06']
-        >>> 'interospective_awareness' in dm_intero.fieldnames()
+        >> 'interospective_awareness' in dm_intero.fieldnames()
         True
-        >>> unique(dm_intero.interospective_awareness) == [0.5555, 0.6666]
+        >> unique(dm_intero.interospective_awareness) == [0.5555, 0.6666]
         True
-        >>> 'interospective_awareness' in dm_emotiv.fieldnames()
+        >> 'interospective_awareness' in dm_emotiv.fieldnames()
         False
-        >>> dm_emotiv.copy_field(dm_intero, 'interospective_awareness', 'subject_id')
-        >>> 'interospective_awareness' in dm_emotiv.fieldnames()
+        >> dm_emotiv.annotate(dm_intero, 'interospective_awareness', 'subject_id')
+        >> 'interospective_awareness' in dm_emotiv.fieldnames()
         True
-        >>> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
+        >> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
         False
         """
         if key_field not in self._fields or key_field not in src_dm._fields:
@@ -389,7 +411,8 @@ class Datamat(object):
         # Datamat. NaNs are fine as indication of this for floats, but if the
         # field happens to hold booleans or integers or something else, NaN
         # does not work.
-        new_shape = [len(self)] + list(data_element.shape)
+        aa = 1 if take_first else 0
+        new_shape = [len(self)] + list(data_element.shape)[aa:]
         new_data = ma.empty(new_shape, data_element.dtype)
         new_data.mask=True
         if np.issubdtype(new_data.dtype, np.float):
@@ -420,12 +443,19 @@ class Datamat(object):
         self._fields.remove(name)
         del self.__dict__[name]
 
+    def rename_field(self, field, new_name):
+        """
+        Simply renames a field of the Datamat.
+        """
+        self.__dict__[new_name] = self.__dict__.pop(field)
+        self._fields[self._fields.index(field)] = new_name
+
     def add_parameter(self, name, value):
         """
         Adds a parameter to the existing Datamat.
         
         Fails if parameter with same name already exists or if name is otherwise
-        in this objects ___dict__ dictionary.
+        in this object's ___dict__ dictionary.
         """
         if self._parameters.has_key(name):
             raise ValueError("'%s' is already a parameter" % (name))
@@ -463,26 +493,75 @@ class Datamat(object):
         self.rm_parameter(name)
         self.add_field(name, data)
         
-    def join(self, fm_new, minimal_subset=True):
+    def add_average_field(self,
+                          field_to_avg,
+                          average_func=np.ma.mean,
+                          valid_range=None #[20, 300]
+                          ):
         """
-        Adds content of a new Datamat to this Datamat.
+        Will run an function over the elements of a field to reduce them
+        to a single metric for each element, and add this reduced data (e.g.
+        the mean value) as a new field to the DataMat.
+        
+        Obvious example is to compute the average pupil size in a single trial.
+        
+        Will honor span start and end indices if they are not masked. 
+        
+        Parameters:
+         field_to_avg : string
+             the name of the field to process
+         average_func : function pointer
+             a pointer to the function to use for each element
+         valid_range : 2-element sequence (tuple or list)
+             if not None, then minimum and maximum dictating the
+             range, outside of which the data will be ignored. The data outside
+             this range will be masked prior to the averaging.
+        
+        """
+        for fieldname in [field_to_avg]:
+            if fieldname not in self.fieldnames():
+                raise ValueError("Required field '%s' not in Datamat." % (
+                            fieldname))
+        avg = []
+        for dmi in self:
+            dat = dmi.field(field_to_avg)[0]
+            if dat is not None:
+                sidx = dmi.span_start_idx[0]
+                if ma.is_masked(sidx):
+                    sidx = 0
+                eidx = dmi.span_end_idx[0]
+                if ma.is_masked(eidx):
+                    eidx = -1
+                spandat = dat[sidx:eidx]
+                if valid_range is not None:
+                    valdat = spandat[(spandat > valid_range[0]) & (spandat < valid_range[1])]
+                else:
+                    valdat = spandat
+                datavg = average_func(valdat) if len(valdat) > 0 else np.NaN
+                avg.append(datavg)
+            else:
+                avg.append(np.NaN)
+
+        avg = ma.masked_invalid(avg)
+        avg.fill_value = np.NaN
+        fname = get_short_function_name(average_func)
+        new_field = (fname) + "_" + field_to_avg
+
+        self.add_field(new_field, avg)
+
+    def join(self, fm_new):
+        """
+        Adds content of a new Datamat to this Datamat, assuming same fields.
        
         If a parameter of the Datamats is not equal or does not exist
         in one, it is promoted to a field.
         
-        If the two Datamats have different fields then the elements for the
-        Datamats that did not have the field will be NaN, unless
-        'minimal_subset' is true, in which case the mismatching fields will
+        If the two Datamats have different fields, the mismatching fields will
         simply be deleted.
         
         Parameters
         fm_new : instance of Datamat
             This Datamat is added to the current one.
-        minimal_subset : if true, remove fields which don't exist in both,
-        	instead of using NaNs for missing elements (defaults to False)
-
-        Capacity to use superset of fields added by rmuil 2012/01/30
-
         """
         # Check if parameters are equal. If not, promote them to fields.
         '''
@@ -498,32 +577,261 @@ class Datamat(object):
         # First those in self that do not exist in new...
         orig_fields = self._fields[:]
         for field in orig_fields:
+            
             if not field in fm_new._fields:
-                if minimal_subset:
-                    self.rm_field(field)
-                else:
-		    warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
-                    fm_new.add_field_like(field, self.field(field))
+                self.rm_field(field)
+                warn("field '%s' doesn't exist in target DataMat, removing." % field)
         # ... then those in the new that do not exist in self.
         orig_fields = fm_new._fields[:]
         for field in orig_fields:
             if not field in self._fields:
-                if minimal_subset:
-                    fm_new.rm_field(field)
-                else:
-	            warnings.warn("This option is deprecated. Clean and Filter your data before it is joined.", DeprecationWarning)
-                    self.add_field_like(field, fm_new.field(field))
-        
-        if 'SUBJECTINDEX' in self._fields[:]:
-            if fm_new.SUBJECTINDEX[0] in self.SUBJECTINDEX:
-                fm_new.SUBJECTINDEX[:] = self.SUBJECTINDEX.max()+1
+                fm_new.rm_field(field)
+                warn("field '%s' doesn't exist in source DataMat, removing." % field)
         # Concatenate fields
         for field in self._fields:
             self.__dict__[field] = ma.hstack((self.__dict__[field], 
                 fm_new.__dict__[field]))
 
         # Update _num_fix
-        self._num_fix += fm_new._num_fix 
+        self._num_fix += fm_new._num_fix
+        
+    def join_full(self, dm_new):
+        """
+        Combines the content of two Datamats.
+       
+        If a parameter of the Datamats is not equal or does not exist
+        in one, it is promoted to a field.
+        
+        If the two Datamats have different fields then the elements for the
+        Datamats that did not have the field will be NaN.
+        
+        Parameters
+        dm_new : instance of Datamat
+            This Datamat is added to the current one.
+
+        Capacity to use superset of fields added by rmuil 2012/01/30
+
+        """
+        # Check if parameters are equal. If not, promote them to fields.
+        for (nm, val) in self._parameters.items():
+            if dm_new._parameters.has_key(nm):
+                if (val != dm_new._parameters[nm]):
+                    self.parameter_to_field(nm)
+                    dm_new.parameter_to_field(nm)
+            else:
+                self.parameter_to_field(nm)
+        for (nm, val) in dm_new._parameters.items():
+            if self._parameters.has_key(nm):
+                if (val != self._parameters[nm]):
+                    self.parameter_to_field(nm)
+                    dm_new.parameter_to_field(nm)
+            else:
+                dm_new.parameter_to_field(nm)
+        # Deal with mismatch in the fields
+        # First those in self that do not exist in new...
+        orig_fields = self._fields[:]
+        for field in orig_fields:
+            if not field in dm_new._fields:
+                dm_new.add_field_like(field, self.field(field))
+        # ... then those in the new that do not exist in self.
+        orig_fields = dm_new._fields[:]
+        for field in orig_fields:
+            if not field in self._fields:
+                self.add_field_like(field, dm_new.field(field))
+
+        # Concatenate fields
+        for field in self._fields:
+            self.__dict__[field] = ma.hstack((self.__dict__[field], 
+                dm_new.__dict__[field]))
+
+        # Update _num_fix
+        self._num_fix += dm_new._num_fix 
+
+#def merge (dm_l, dm_r, data_field, key_field):
+#    """
+#    Merges two DataMats.
+#
+#    This operation corresponds loosely to an SQL JOIN operation.
+#
+#    This is accomplished through the use of a key_field, which is
+#    used to determine how the data is copied. The key_field must
+#    provide a 1-to-1 mapping between the DataMats - that is, for
+#    every unique value of src_dm.field(key_field) there must exist
+#    only one element in self.field(key_field).
+#
+#    The two Datamats are essentially aligned by the unique values
+#    of key_field so that each block element of the new field of the target
+#    Datamat will consist of those elements of src_dm's data_field
+#    where the corresponding element in key_field matches.
+#
+#    The target Datamat (self) must not have a field name data_field
+#    already, and both Datamats must have key_field.
+#
+#    The new field in the target Datamat will be a masked array to handle
+#    non-existent data.
+#
+#    Examples:
+#        TODO: Make example more generic, remove interoceptive reference
+#        TODO: Make stand-alone test
+#
+#    >> dm_intero = load_interoception_files ('test-ecg.csv', silent=True)
+#    >> dm_emotiv = load_emotivestimuli_files ('test-bpm.csv', silent=True)
+#    >> length(dm_intero)
+#    4
+#    >> unique(dm_intero.subject_id)
+#    ['p05', 'p06']
+#    >> length(dm_emotiv)
+#    3
+#    >> unique(dm_emotiv.subject_id)
+#    ['p04', 'p05', 'p06']
+#    >> 'interospective_awareness' in dm_intero.fieldnames()
+#    True
+#    >> unique(dm_intero.interospective_awareness) == [0.5555, 0.6666]
+#    True
+#    >> 'interospective_awareness' in dm_emotiv.fieldnames()
+#    False
+#    >> dm_emotiv.annotate(dm_intero, 'interospective_awareness', 'subject_id')
+#    >> 'interospective_awareness' in dm_emotiv.fieldnames()
+#    True
+#    >> unique(dm_emotiv.interospective_awareness) == [NaN, 0.5555, 0.6666]
+#    False
+#    """
+#    raise NotImplementedError()
+#
+#    if key_field not in dm_l._fields or key_field not in dm_r._fields:
+#        raise AttributeError('key field (%s) must exist in both Datamats'%(
+#                            key_field))
+#    if data_field not in dm_r._fields:
+#        raise AttributeError('data field (%s) must exist in left Datamat' % (
+#                            data_field))
+#    if data_field in dm_r._fields:
+#        raise AttributeError('data field (%s) already exists in right Datamat' % (
+#                            data_field))
+#    if len(dm_l.field(key_field)) != len(np.unique(dm_l.field(key_field))):
+#        raise AttributeError('non-unique elements exist in left DataMat for key field (%s)' % (
+#                            key_field))
+#    if len(dm_r.field(key_field)) != len(np.unique(dm_r.field(key_field))):
+#        raise AttributeError('non-unique elements exist in right DataMat for key field (%s)' % (
+#                            key_field))
+#
+#    #Create a mapping of key_field value to data value.
+#    data_to_copy = dict([(x.field(key_field)[0], x.field(data_field)) for x in src_dm.by_field(key_field)])
+#
+#    data_element = data_to_copy.values()[0]
+#
+#    #Create the new data array of correct size.
+#    # We use a masked array because it is possible that for some elements
+#    # of the target Datamat, there exist simply no data in the source
+#    # Datamat. NaNs are fine as indication of this for floats, but if the
+#    # field happens to hold booleans or integers or something else, NaN
+#    # does not work.
+#    new_shape = [len(self)] + list(data_element.shape)
+#    new_data = ma.empty(new_shape, data_element.dtype)
+#    new_data.mask=True
+#    if np.issubdtype(new_data.dtype, np.float):
+#        new_data.fill(np.NaN) #For backwards compatibility, if mask not used
+#
+#    #Now we copy the data. If the data to copy contains only a single value,
+#    # it is added to the target as a scalar (single value).
+#    # Otherwise, it is copied as is, i.e. as a sequence.
+#    for (key, val) in data_to_copy.iteritems():
+#        new_data[self.field(key_field) == key] = val[0]
+#
+#    self.add_field(data_field, new_data)
+
+def  get_short_function_name(func):
+    """
+    Bit of a kludge, to allow automatic determination of field name
+    for the add_average_field() func: simply makes a human-friendly name
+    from the function name.
+    """
+    fname = func.__name__
+    if fname.startswith('nan'):
+        sname = fname[3:]
+    else:
+        sname = fname
+    return sname
+
+def flatten(dm):
+    """
+    Takes a DataMat who's elements are arrays and returns a flattened copy
+    in which the DataMat element is the lowest atom of data: so no DataMat
+    element contains time-indexed fields: all the time points are directly,
+    flatly, accessible.
+    Makes DataMat potentially extremely long, but eases merging, aligning, 
+    and maybe also analysis.
+    """
+    tmfields = dm.time_based_fields
+    seqfields = []
+    dbg(2, 'will flatten DataMat with %d elements.' % (len(dm)))
+    #Step 1. Determine which fields need flattening.
+    # TODO: a better test for the sequence fields is needed here.
+    for f in dm.fieldnames():
+        if (dm.__dict__[f].dtype == np.object) and isiterable(dm.__dict__[f][0]):
+            seqfields += [f]
+            dbg(3, "seqfield: %s, %s, %s" % (f, 
+                    type(dm.__dict__[f][0]),
+                    dm.__dict__[f][0].dtype))
+
+    #Step 2. Determine the amount of elements in the fields to be flattened.
+    nelements = []
+    for dmi in dm:
+        elementn = [len(dmi.field(f)[0]) for f in seqfields]
+        assert(all_same(elementn))
+        nelements += [elementn[0]]
+    dbg(2, 'flattened DataMat will contain %d elements' % (sum(nelements)))
+
+    newdm = dm.copy_empty()
+    newdm._num_fix = sum(nelements)
+
+    nonseqfields = set(seqfields).symmetric_difference(set(dm.fieldnames()))
+    newdata = {}
+    newmask = {}
+    #Step 3. Create new, empty, arrays for each of the non-sequence fields.
+    for f in nonseqfields:
+        dbg(3, "creating empty non-seq field '%s'" % (f))
+        #to avoid problems with uninitialised values, use ma_nans instead of
+        # ma.empty(sum(nelements), dtype=dm.field(f).dtype)
+        if isiterable(dm.field(f)[0]):
+            fdtype = np.object
+        else:
+            fdtype = dm.field(f).dtype
+
+        newdata[f] = ma_nans(sum(nelements)).astype(fdtype)
+
+    #Step 4. Expand all non-sequence fields into the new empty arrays.
+    sidx = 0
+    for idx, dmi in enumerate(dm):
+        eidx = sidx + nelements[idx]
+        dbg(4, '%d,%d' % (sidx, eidx))
+        for f in nonseqfields:
+            dbg(3, "element %d/%d: filling non-seq field '%s' [%d:%d] (%s)" % (idx,
+                    len(dm),
+                    f,
+                    sidx, eidx,
+                    str(dmi.field(f)[0])))
+            if isiterable(dmi.field(f)[0]):
+                for ii in xrange(sidx, eidx):
+                    newdata[f][ii] = \
+                        dmi.field(f)[0].astype(np.object)
+            else:
+                newdata[f][sidx:eidx] = dmi.field(f)[0]
+        sidx = eidx
+
+
+    #Step 5. Stack all the sequence fields together.
+    for f in seqfields:
+        dbg(3, "stacking sequence field '%s'" % (f))
+        newdata[f] = np.hstack(dm.field(f))
+        newmask[f] = np.hstack(np.ma.getmaskarray(dm.field(f)))
+        dbg(4, 'newmask[%s]: %s' % (f, newmask[f]))
+        warn('todo: set mask correctly')
+
+    #Step 6. Create the new DataMat
+    for k, v in newdata.iteritems():
+        newdm.add_field(k, v)
+
+    return newdm #newdata, newmask
 
 def load(path):
     """
@@ -533,6 +841,7 @@ def load(path):
         path : string
             Absolute path of the file to load from.
     """
+    import h5py
     f = h5py.File(path,'r')
     dm = fromhdf5(f['Datamat'])
     f.close()
@@ -546,11 +855,12 @@ def fromhdf5(fm_group):
     for key, value in fm_group.attrs.iteritems():
         params[key] = value
     return VectorFactory(dm, params)
-       
-def VectorFactory(fields, parameters, categories = None):
-    '''
-    Creates a datamat from a dictionary that contains lists/arrays as values.
-
+ 
+def VectorFactory(fields, parameters={}):
+    """
+    Creates a new DataMat based on 2 dictionaries: one for the fields and one
+    for the parameters.
+    
     Input:
         fields: Dictionary
             The values will be used as fields of the datamat and the keys
@@ -558,14 +868,34 @@ def VectorFactory(fields, parameters, categories = None):
         parameters: Dictionary
             A dictionary whose values are added as parameters. Keys are used
             for parameter names.
-    '''
-    fm = Datamat(categories = categories)
+
+    >>> new_dm = VectorFactory({'field1':ma.array([1,2,3,4]),\
+    'field2':ma.array(['a','b','c','d'])},{'param1':'some parameter'})
+    >>> new_dm
+    Datamat(4 elements)
+    >>> print new_dm # doctest:+ELLIPSIS
+    Datamat with 4 elements and the following data fields:
+              Field Name |     Length    |    Type    |        Values       
+    ---------------------+---------------+------------+----------------
+                  field1 |       4       |   int64    |      [1 2 3 4]      
+                  field2 |       4       |    |S1     |  ['a' 'b' 'c' 'd']  
+    ---------------------+---------------+------------+----------------
+          Parameter Name | Value               
+    ---------------------+---------------------------------------------
+                  param1 | some parameter
+    ...
+    
+    >>> new_dm = VectorFactory({'field1':ma.array([1,2,3,4])})
+    >>> new_dm
+    Datamat(4 elements)
+    """ 
+    fm = Datamat()
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
-        fm.__dict__[field] = np.asarray(value)
+        fm.__dict__[field] = np.asanyarray(value)
     fm._parameters = parameters
     for (field, value) in parameters.iteritems(): 
-       fm.__dict__[field] = value
+        fm.__dict__[field] = value
     fm._num_fix = len(fm.__dict__[fields.keys()[0]])
     return fm
 
@@ -589,7 +919,7 @@ class AccumulatorFactory(object):
                 if not key in a.keys():
                     # key is not in new data. value should be nan
                     value = np.nan
-                self.d[key].extend([value])                
+                self.d[key].extend([value])
     
     def get_dm(self, params = None):
         if params is None:

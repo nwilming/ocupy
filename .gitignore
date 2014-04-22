@@ -6,3 +6,5 @@ ocupy.egg-info
 *~
 .*.swp
 *DS_STORE
+.settings
+README.svn
