@@ -68,6 +68,12 @@ class Datamat(object):
                 that a datamat always holds arrays, never scalar values, as fields.
 
         TODO: thoroughly test that all indices work as expected (including slicing etc)
+
+
+        The indexing of a DataMat is achieved with the same semantics as the indexing
+        of a numpy array. That is, fancy indexing returns a copy of the fields, whereas
+        other types of indexing such as slicing will return views. This is potentially
+        tricky because all parameters will always be copies.
         
         NB: because of this usage of the constructor to filter also,
         and because of the non-intuitive self object in Python, and because of
