@@ -12,9 +12,9 @@ class Datamat(object):
     Represents grouped data.
 
     The datamat holds, filters and stores attributes that are grouped by some 
-		event. For example, a group could be a trial in an experiment. The 
-		attributes of this group might be associated with the subject's name or a
-		trial condition.
+		event. For example, a group could be a trial in an experiment. 
+                The attributes of this group might be associated with the 
+                subject's name or a trial condition.
      
     A datamat consists of lists called 'fields' which represent the raw
     underlying data and its attributes.
@@ -196,21 +196,25 @@ class Datamat(object):
                 Absolute path of the file to save to.
         """
         f = h5py.File(path, 'w')
-        fm_group = f.create_group('Datamat')
-        for field in self.fieldnames():
-            fm_group.create_dataset(field, data = self.__dict__[field])
-        for param in self.parameters():
-            fm_group.attrs[param]=self.__dict__[param]
-        f.close()
-    
-    def tohdf5(self, h5obj, name):
-        fm_group = h5obj.create_group(name)
-        for field in self.fieldnames():
-            fm_group.create_dataset(field, data = self.__dict__[field])
-        for param in self.parameters():
-            fm_group.attrs[param]=self.__dict__[param]
+        try:
+            fm_group = f.create_group('Datamat')
+            for field in self.fieldnames():
+                try:
+                    fm_group.create_dataset(field, data = self.__dict__[field])
+                except (TypeError,) as e:
+                    # Assuming field is an object array that contains dicts which
+                    # contain numpy arrays as values
+                    sub_group = fm_group.create_group(field)
+                    for i, d in enumerate(self.__dict__[field]):
+                        index_group = sub_group.create_group(str(i))
+                        for key, value in d.iteritems():
+                            index_group.create_dataset(key, data=value)
 
-                
+            for param in self.parameters():
+                fm_group.attrs[param]=self.__dict__[param]
+        finally:
+            f.close()
+    
     def fieldnames(self):
         """
         Returns a list of data fields that are present in the datamat.
@@ -534,14 +538,24 @@ def load(path):
             Absolute path of the file to load from.
     """
     f = h5py.File(path,'r')
-    dm = fromhdf5(f['Datamat'])
-    f.close()
+    try:
+        dm = fromhdf5(f['Datamat'])
+    finally:
+        f.close()
     return dm
 
 def fromhdf5(fm_group):
     dm = {}
     params = {}
     for key, value in fm_group.iteritems():
+        if 'HDF5 group' in str(value):
+            # Restore to dict object field
+            field_group = value 
+            field = np.empty((len(field_group.keys()),), dtype=object)
+            for index, igroup in field_group.iteritems():
+                d = dict((dk,dv[:]) for dk,dv in igroup.iteritems())
+                field[int(index)] = d
+            value = field
         dm[key] = value
     for key, value in fm_group.attrs.iteritems():
         params[key] = value
