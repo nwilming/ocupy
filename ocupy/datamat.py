@@ -587,24 +587,29 @@ class AccumulatorFactory(object):
     
     def __init__(self):
         self.d = {}
+        self.num_elements = 0
 
     def update(self, a):
         if len(self.d.keys()) == 0:
             self.d = dict((k,[v]) for k,v in a.iteritems())
+            self.num_elements = len(self.d[a.keys()[0]])
         else:
             # For all fields in a that are also in dict
+            lens = []
             all_keys = set(a.keys() + self.d.keys())
             for key in all_keys:
                 if key in a.keys():
                     value = a[key]
                 if not key in self.d.keys():
                     # key is not yet in d. add it
-                    self.d[key] = [np.nan]*len(self.d[self.d.keys()[0]])
+                    self.d[key] = [np.nan]*self.num_elements
                 if not key in a.keys():
                     # key is not in new data. value should be nan
                     value = np.nan
                 self.d[key].extend([value])                
-    
+                lens.append(len(self.d[key]))
+            self.num_elements = len(self.d[self.d.keys()[0]])
+
     def get_dm(self, params = None):
         if params is None:
             params = {}
