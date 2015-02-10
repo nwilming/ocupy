@@ -576,7 +576,11 @@ def VectorFactory(fields, parameters, categories = None):
     fm = Datamat(categories = categories)
     fm._fields = fields.keys()
     for (field, value) in fields.iteritems(): 
-        fm.__dict__[field] = np.asarray(value)
+        try:
+            fm.__dict__[field] = np.asarray(value)
+        except ValueError:
+            fm.__dict__[field] = np.asarray(value, dtype=np.object)
+
     fm._parameters = parameters
     for (field, value) in parameters.iteritems(): 
        fm.__dict__[field] = value
@@ -584,7 +588,9 @@ def VectorFactory(fields, parameters, categories = None):
     return fm
 
 class AccumulatorFactory(object):
-    
+    '''
+    Accumulates single samples of a datamat.
+    '''
     def __init__(self):
         self.d = {}
         self.num_elements = 0
