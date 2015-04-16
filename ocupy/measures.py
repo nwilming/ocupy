@@ -263,7 +263,7 @@ def roc_model(prediction, fm, ctr_loc = None, ctr_size = None):
         ctr_loc = ((r_y * np.array(ctr_loc[0])).astype(int), 
                    (r_x * np.array(ctr_loc[1])).astype(int))
     controls = prediction[ctr_loc[0], ctr_loc[1]]
-    return faster_roc(actuals, controls)[0]
+    return fast_roc(actuals, controls)[0]
     
 
 def fast_roc(actuals, controls):

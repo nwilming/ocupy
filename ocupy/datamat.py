@@ -529,7 +529,7 @@ class Datamat(object):
         # Update _num_fix
         self._num_fix += fm_new._num_fix 
 
-def load(path):
+def load(path, variable='Datamat'):
     """
     Load datamat at path.
     
@@ -539,7 +539,7 @@ def load(path):
     """
     f = h5py.File(path,'r')
     try:
-        dm = fromhdf5(f['Datamat'])
+        dm = fromhdf5(f[variable])
     finally:
         f.close()
     return dm
@@ -638,13 +638,22 @@ class DatamatAccumulator(object):
         dm_all = self.l[0].copy()
         dm_all._num_fix = length
         for f in names:
-            dm_all.rm_field(f)
-            dm_all.add_field(f, np.ones((length,)))
-            offset = 0
-            for d in self.l:
-                val = d.field(f)
-                dm_all.field(f)[offset:offset+len(d)] = val
-                offset = offset+len(d)
+            if len(dm_all.field(f).shape) == 1:
+                # 1D case
+                dm_all.rm_field(f)
+                dm_all.add_field(f, np.ones((length,)))
+                offset = 0
+                for d in self.l:
+                    val = d.field(f)
+                    dm_all.field(f)[offset:offset+len(d)] = val
+                    offset = offset+len(d)
+            elif len(dm_all.field(f).shape) == 2:
+                # 2D case
+                new_field = np.vstack([d.field(f) for d in self.l])
+                dm_all.rm_field(f)
+                dm_all.add_field(f, new_field)
+            else:
+                raise RuntimeError('Can only join up to 2D fields')
         return dm_all
                 
 

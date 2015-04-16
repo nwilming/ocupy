@@ -326,7 +326,7 @@ def N(u,i,p,knots):
     at knot i and point u.
     """
     if p == 0:
-        if knots[i] <= u and u < knots[i+1]:
+        if knots[i] < u and u <=knots[i+1]:
             return 1.0
         else:
             return 0.0
