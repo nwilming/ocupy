@@ -641,7 +641,7 @@ class DatamatAccumulator(object):
             if len(dm_all.field(f).shape) == 1:
                 # 1D case
                 dm_all.rm_field(f)
-                dm_all.add_field(f, np.ones((length,)))
+                dm_all.add_field(f, np.ones((length,), dtype=self.l[0].field(f).dtype))
                 offset = 0
                 for d in self.l:
                     val = d.field(f)
