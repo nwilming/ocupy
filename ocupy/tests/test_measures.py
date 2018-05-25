@@ -19,15 +19,15 @@ class TestMeasures(unittest.TestCase):
                              measures.kldiv_model, 
                              measures.nss_model])
         scores  =  measures.prediction_scores(fdm, fm) 
-        self.assertEquals(len(scores), 3)
+        self.assertEqual(len(scores), 3)
         measures.set_scores([measures.roc_model])
         scores  =  measures.prediction_scores(fdm, fm) 
-        self.assertEquals(len(scores), 1)
+        self.assertEqual(len(scores), 1)
         measures.set_scores([measures.roc_model, 
                              measures.kldiv_model, 
                              measures.nss_model])
         scores  =  measures.prediction_scores(fdm, fm) 
-        self.assertEquals(len(scores), 3)
+        self.assertEqual(len(scores), 3)
 
     def test_kldiv(self):
         arr = scipy.random.random((21,13))
@@ -64,10 +64,10 @@ class TestMeasures(unittest.TestCase):
         # With itself should give 1
         fdm = fixmat.compute_fdm(fm)
         corr = measures.correlation_model(fdm,fm)
-        self.assertEquals(corr,1)
+        self.assertEqual(corr,1)
         # Anti-correlation should give -1
         corr = measures.correlation_model(-1*fdm,fm)
-        self.assertEquals(corr,-1)
+        self.assertEqual(corr,-1)
     
     def test_nss_values(self):
         fm = fixmat.TestFixmatFactory(categories = [1,2,3], 
@@ -90,7 +90,7 @@ class TestMeasures(unittest.TestCase):
        try: 
            import opencv
        except ImportError:
-           print "Skipping EMD test - no opencv available"
+           print("Skipping EMD test - no opencv available")
            return 
        opencv # pyflakes
        fm = fixmat.TestFixmatFactory(categories = [1,2,3], 
@@ -102,7 +102,7 @@ class TestMeasures(unittest.TestCase):
        e = measures.emd_model(arr, fm)
        self.assertTrue(e > 0)
        e = measures.emd(fdm, fdm)
-       self.assertEquals(e, 0) 
+       self.assertEqual(e, 0) 
 
         
     def test_fast_roc(self):
@@ -148,22 +148,22 @@ class TestMeasures(unittest.TestCase):
         self.assertAlmostEqual(measures.exact_roc(actuals, controls)[0] + measures.exact_roc(controls, actuals)[0],1)
 
     def skip_intersubject_auc(self):
-        points = zip(range(1,16),range(1,16))
+        points = list(zip(list(range(1,16)),list(range(1,16))))
         fm = fixmat.TestFactory(points = points, 
-            filenumbers = range(1,11), subjectindices = range(1,11)) 
+            filenumbers = list(range(1,11)), subjectindices = list(range(1,11))) 
         (auc1, _, _) = measures.intersubject_scores_random_subjects(fm, 1, 1, 2, 2, False)
         (auc2, _, _) = measures.intersubject_scores_random_subjects(fm, 1, 1, 2, 2, True)
 
     def skip_intersubject_auc_scaled(self):
-        points = zip(range(1,16),range(1,16))
+        points = list(zip(list(range(1,16)),list(range(1,16))))
         fm = fixmat.TestFactory(points = points, 
-            filenumbers = range(1,11), subjectindices = range(1,11)) 
+            filenumbers = list(range(1,11)), subjectindices = list(range(1,11))) 
         (auc1, _, _) = measures.intersubject_scores(fm, 1,[1], [1], [2], [2], controls=False, scale_factor = 0.5)
         (auc2, _, _) = measures.intersubject_scores(fm,1, [1], [1], [2],[2], controls=True, scale_factor = 0.5)
    
  
     def test_nss(self):
-        fm = fixmat.TestFixmatFactory(points=zip([0,500,1000],[1,10,10]),
+        fm = fixmat.TestFixmatFactory(points=list(zip([0,500,1000],[1,10,10])),
                 params = {'image_size':[100,10]})
         fm.SUBJECTINDEX = np.array([1,1,1])
         fm.filenumber = np.array([1,1,1])
@@ -177,8 +177,8 @@ class TestMeasures(unittest.TestCase):
 
     def skip_emd(self):
         fm1 = fixmat.TestFactory(params = {'image_size':[93,128]})
-        fm2 = fixmat.TestFactory(points=zip(range(10,50),range(10,50)),params = {'image_size':[93,128]})
-        self.assertEquals(measures.emd_model(fixmat.compute_fdm(fm1), fm1), 0)
+        fm2 = fixmat.TestFactory(points=list(zip(list(range(10,50)),list(range(10,50)))),params = {'image_size':[93,128]})
+        self.assertEqual(measures.emd_model(fixmat.compute_fdm(fm1), fm1), 0)
         self.assertTrue(not (measures.emd_model(fixmat.compute_fdm(fm1), fm2) == 0))
 
 

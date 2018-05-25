@@ -2,7 +2,7 @@
 """This module implements functions for prediction bound computation."""
 
 import numpy as np
-from scipy.stats import nanmean
+from scipy import nanmean
 
 from ocupy import measures
 from ocupy.fixmat import compute_fdm
@@ -145,7 +145,7 @@ def upper_bound(fm, nr_subs = None, scale_factor = 1):
         res_dict = {}
         result_vectors = [np.empty(nr_subs_total) + np.nan
                             for _ in np.unique(fm.category)]
-        res_dict.update(zip(np.unique(fm.category), result_vectors))
+        res_dict.update(list(zip(np.unique(fm.category), result_vectors)))
         intersub_scores.append(res_dict)
     #compute inter-subject scores for every stimulus, with leave-one-out
     #over subjects
@@ -200,7 +200,7 @@ def lower_bound(fm, nr_subs = None, nr_imgs = None, scale_factor = 1):
         res_dict = {}
         result_vectors = [np.empty(nr_subs_total) + np.nan
                             for _ in np.unique(fm.category)]
-        res_dict.update(zip(np.unique(fm.category),result_vectors))
+        res_dict.update(list(zip(np.unique(fm.category),result_vectors)))
         sb_scores.append(res_dict)
     # compute mean spatial bias predictive power for all subjects in all
     # categories

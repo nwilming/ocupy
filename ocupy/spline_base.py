@@ -4,7 +4,7 @@ try:
 except ImportError:
     from scikits.learn import linear_model
 
-from utils import Memoize
+from .utils import Memoize
 
 def fit3d(samples, e_x, e_y, e_z, remove_zeros = False, **kw):
     """Fits a 3D distribution with splines.

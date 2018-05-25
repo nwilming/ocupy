@@ -43,7 +43,7 @@ class TestBounds(unittest.TestCase):
         self.assertTrue(np.isnan(auc) and np.isnan(kl) and np.isnan(nss))
  
     def check_bounds(self, auc):
-        self.assertEquals(len(auc.keys()), 3)
+        self.assertEqual(len(list(auc.keys())), 3)
         for cat in np.unique(self.fm.category):
             self.assertEqual(len(auc[cat]), 6)
             for val in auc[cat]:

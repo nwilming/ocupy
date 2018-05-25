@@ -3,9 +3,9 @@
 parallel tasks over a grid"""
 
 import math
-import cPickle
+import pickle
 
-import xmlrpclib
+import xmlrpc.client
 
 import numpy as np
 
@@ -63,7 +63,7 @@ class TaskManager(xmlrpc.XMLRPC):
         Reschedule all running tasks. 
         """
         if not len(self.scheduled_tasks) == 0:
-            self.reschedule = list(self.scheduled_tasks.iteritems())
+            self.reschedule = list(self.scheduled_tasks.items())
             self.scheduled_tasks = {}
         return True 
 
@@ -74,17 +74,17 @@ class TaskManager(xmlrpc.XMLRPC):
         """
         try:
             if len(self.reschedule) == 0:
-                (task_id, cur_task) = self.task_iterator.next()
+                (task_id, cur_task) = next(self.task_iterator)
             else:
                 (task_id, cur_task) = self.reschedule.pop()
             self.scheduled_tasks.update({task_id: cur_task})
             return (task_id, cur_task.to_dict())
         except StopIteration:
-            print 'StopIteration: No more tasks'
+            print('StopIteration: No more tasks')
             return False
         except Exception as err:
-            print 'Some other error'
-            print err
+            print('Some other error')
+            print(err)
             return False                        
 
     def xmlrpc_task_done(self, result):
@@ -117,9 +117,9 @@ class TaskManager(xmlrpc.XMLRPC):
         """
         savefile = open(filename,'wb')
         try:
-            cPickle.dump({'scheduled':self.scheduled_tasks,
+            pickle.dump({'scheduled':self.scheduled_tasks,
                           'reschedule':self.reschedule},savefile)
-        except cPickle.PicklingError:
+        except pickle.PicklingError:
             return -1
         savefile.close()
         return 1
@@ -145,7 +145,7 @@ class Worker(object):
     called when the Worker inits.  
     """
     def __init__(self, url, task_store):
-        self.server = xmlrpclib.Server(url)
+        self.server = xmlrpc.client.Server(url)
         self.setup()   
         self.results = [] 
         self.task_store = task_store
@@ -231,12 +231,12 @@ class TaskStore(object):
            set of tasks."""
         step = int(math.ceil(self.num_tasks / float(self.partitions)))
         if self.indices == None:
-            slice_ind = range(0, self.num_tasks, step)
+            slice_ind = list(range(0, self.num_tasks, step))
             for start in slice_ind:
                 yield self.__class__(self.partitions, 
-                                     range(start, start + step))
+                                     list(range(start, start + step)))
         else:
-            slice_ind = range(0, len(self.indices), step)
+            slice_ind = list(range(0, len(self.indices), step))
             for start in slice_ind:
                 if start + step <= len(self.indices):
                     yield self.__class__(self.partitions, 

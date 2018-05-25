@@ -56,25 +56,25 @@ class TestCompareMethods(object):
         for k in range(5):
             self.new_samples()
             kls += self.eval_fits()
-        print np.mean(np.array(kls))
+        print(np.mean(np.array(kls)))
 
     def eval_fits(self):
-        print 'Fit Splines'
+        print('Fit Splines')
         spline_fit, hist = sb.fit2d(self.train_samples, 
                 np.linspace(0,self.shape[0], self.shape[0]+1),
                 np.linspace(0,self.shape[1], self.shape[1]+1))
         spline_kl = measures.kldiv(spline_fit, self.target)
         hist_kl = measures.kldiv(hist, self.target)
         try:
-            print 'Fit KDE'
+            print('Fit KDE')
             kde_est = gaussian_kde(self.train_samples)
             x,y = np.mgrid[0:self.shape[0], self.shape[1]]
             kde_fit = kde_est.evaluate((np.array(x), np.array(y)))
             kde_kl = measures.kldiv(kde_fit, self.target)
         except:
            kde_kl = np.nan
-           print 'LinAlgError' 
-        print spline_kl, hist_kl, kde_kl
+           print('LinAlgError') 
+        print(spline_kl, hist_kl, kde_kl)
         return spline_kl, hist_kl, kde_kl
         
 def r_squared(x,y):

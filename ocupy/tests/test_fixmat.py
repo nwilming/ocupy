@@ -12,7 +12,7 @@ from scipy.io import loadmat
 
 from ocupy import fixmat, stimuli, loader
 
-import test_loader
+from . import test_loader
 
 
 class TestFixmat(unittest.TestCase):
@@ -25,7 +25,7 @@ class TestFixmat(unittest.TestCase):
                                 params = {'pixels_per_degree':10, 'image_size':[100,500]})
         # We can produce a pretty table with the fixmats parameters by
         # printin it:
-        print fm
+        print(fm)
         # Check parameter access
         self.assertTrue( fm.pixels_per_degree == 10)
         self.assertTrue( fm.image_size[0] == 100 and fm.image_size[1] == 500 )
@@ -58,13 +58,13 @@ class TestFixmat(unittest.TestCase):
  
         # Test iterating over fixmat
         for (img, img_mat) in zip([1,2,3,4,5,6],fm.by_field('filenumber')):
-            self.assertEquals( len(np.unique(img_mat.filenumber)), 1 )
-            self.assertEquals( np.unique(img_mat.filenumber)[0],  img)
+            self.assertEqual( len(np.unique(img_mat.filenumber)), 1 )
+            self.assertEqual( np.unique(img_mat.filenumber)[0],  img)
         
         # Test adding fields
         fm.add_field('x2', fm.x)
         for (x1,x2) in zip(fm.x, fm.x2):
-            self.assertEquals(x1,  x2)
+            self.assertEqual(x1,  x2)
         
         self.assertRaises(ValueError, lambda: fm.add_field('x3', [1]))
         self.assertRaises(ValueError, lambda: fm.add_field('x2', fm.x))
@@ -83,11 +83,11 @@ class TestFixmat(unittest.TestCase):
     def compare_fixmats(self, a, b):
         for field in a.fieldnames():
             for (v1, v2) in zip(a.__dict__[field], b.__dict__[field]):
-                self.assertEquals(v1, v2) 
+                self.assertEqual(v1, v2) 
 
     def gen_sub(self, subind,numfix):
         fm = fixmat.TestFixmatFactory(subjectindices = [subind],
-                 points = [range(0,numfix),range(0,numfix)],
+                 points = [list(range(0,numfix)),list(range(0,numfix))],
                  categories = [1,2,3,4,5,6,7],
                  filenumbers = [1,2,3,4,5,6,7])
         return fm
@@ -95,7 +95,7 @@ class TestFixmat(unittest.TestCase):
     def test_getattr(self):
         # Test the 
         # Set up a fake dir structure to generate an aligned fixmat 
-        img_per_cat = {1:range(1,11), 2:range(1,11)}
+        img_per_cat = {1:list(range(1,11)), 2:list(range(1,11))}
         features = ['a', 'b']
         path, ftrpath = test_loader.create_tmp_structure(img_per_cat, features = features)
         l = loader.LoadFromDisk(impath = path, 
@@ -103,13 +103,13 @@ class TestFixmat(unittest.TestCase):
                                 size = (100,100)) 
         inp = stimuli.Categories(l, img_per_cat, features) 
         fm = fixmat.TestFixmatFactory(categories = [1,2], 
-                                filenumbers = range(1,11),
+                                filenumbers = list(range(1,11)),
                                 subjectindices = [1, 2, 3, 4, 5, 6],
                                 params = {'pixels_per_degree':10, 'image_size':[100,100]},
                                 categories_obj = inp)
         
         fm_err = fixmat.TestFixmatFactory(categories = [1,2], 
-                                filenumbers = range(1,11),
+                                filenumbers = list(range(1,11)),
                                 subjectindices = [1, 2, 3, 4, 5, 6],
                                 params = {'pixels_per_degree':10, 'image_size':[100,100]})
 
@@ -118,24 +118,24 @@ class TestFixmat(unittest.TestCase):
         fm.add_feature_values(['a', 'b'])
         self.assertRaises(RuntimeError, lambda: fm_err.add_feature_values(['a', 'b']))
         for cat_mat, cat_inp in fm.by_cat():
-            self.assertEquals(cat_mat.category[0], cat_inp.category)
+            self.assertEqual(cat_mat.category[0], cat_inp.category)
             for img_mat, img_inp in cat_mat.by_filenumber():
-                self.assertEquals(img_mat.filenumber[0], img_inp.image)
-        self.assertEquals(len(fm.a), len(fm.x))
-        self.assertEquals(len(fm.b), len(fm.x))
+                self.assertEqual(img_mat.filenumber[0], img_inp.image)
+        self.assertEqual(len(fm.a), len(fm.x))
+        self.assertEqual(len(fm.b), len(fm.x))
         # Let's also check if make_reg_data works
         a, b = fm.make_reg_data(features)
-        self.assertEquals(a.shape[1], len(fm.x))
-        self.assertEquals(a.shape[0], len(features))
-        self.assertEquals(b.shape[1], len(fm.x))
-        self.assertEquals(b.shape[0], len(features))
-        self.assertEquals(b.sum(), a.sum())
+        self.assertEqual(a.shape[1], len(fm.x))
+        self.assertEqual(a.shape[0], len(features))
+        self.assertEqual(b.shape[1], len(fm.x))
+        self.assertEqual(b.shape[0], len(features))
+        self.assertEqual(b.sum(), a.sum())
         a, b = fm.make_reg_data(features, all_controls = True)
-        self.assertEquals(a.shape[1], len(fm.x))
-        self.assertEquals(a.shape[0], len(features))
-        self.assertEquals(b.shape[1], len(fm.x))
-        self.assertEquals(b.shape[0], len(features))
-        self.assertEquals(b.sum(), a.sum())
+        self.assertEqual(a.shape[1], len(fm.x))
+        self.assertEqual(a.shape[0], len(features))
+        self.assertEqual(b.shape[1], len(fm.x))
+        self.assertEqual(b.shape[0], len(features))
+        self.assertEqual(b.sum(), a.sum())
         test_loader.rm_tmp_structure(path)
         test_loader.rm_tmp_structure(ftrpath) 
  
@@ -144,10 +144,10 @@ class TestFixmat(unittest.TestCase):
         fm = self.gen_sub(1,numfix)
         for (cat, cat_mat) in enumerate(fm.by_field('category')):
             for (img, img_mat) in enumerate(cat_mat.by_field('filenumber')):
-                self.assertEquals(len(img_mat.x), 1)
-                self.assertEquals(img_mat.SUBJECTINDEX[0], 1)
-                self.assertEquals(img_mat.filenumber[0], img+1)
-                self.assertEquals(img_mat.category[0], cat+1)
+                self.assertEqual(len(img_mat.x), 1)
+                self.assertEqual(img_mat.SUBJECTINDEX[0], 1)
+                self.assertEqual(img_mat.filenumber[0], img+1)
+                self.assertEqual(img_mat.category[0], cat+1)
     
     def test_multiple_subs(self):
         import random
@@ -159,10 +159,10 @@ class TestFixmat(unittest.TestCase):
         for (i,sub_mat) in enumerate(fm_all.by_field('SUBJECTINDEX')):
             for (cat,cat_mat) in enumerate(sub_mat.by_field('category')):
                 for (img,img_mat) in enumerate(cat_mat.by_field('filenumber')):
-                    self.assertEquals(len(img_mat.x), numfix)
-                    self.assertEquals(img_mat.SUBJECTINDEX[0], i)
-                    self.assertEquals(img_mat.filenumber[0], img+1)
-                    self.assertEquals(img_mat.category[0], cat+1)
+                    self.assertEqual(len(img_mat.x), numfix)
+                    self.assertEqual(img_mat.SUBJECTINDEX[0], i)
+                    self.assertEqual(img_mat.filenumber[0], img+1)
+                    self.assertEqual(img_mat.category[0], cat+1)
     
     def test_attribute_access(self):
         fm = self.gen_sub(0,100) 
@@ -170,9 +170,9 @@ class TestFixmat(unittest.TestCase):
         fx = fm.x
         fy = fm.y
         for k in range(0,100):
-            self.assertEquals(fsi[k], 0)
-            self.assertEquals(fx[k], k)
-            self.assertEquals(fy[k], k)
+            self.assertEqual(fsi[k], 0)
+            self.assertEqual(fx[k], k)
+            self.assertEqual(fy[k], k)
    
     def test_factories(self):
         with NamedTemporaryFile(mode = 'w', prefix = 'fix_occ_test',
@@ -203,7 +203,7 @@ class TestFixmat(unittest.TestCase):
         for field in fm._fields:
             l1 = fm_ref[field]
             l2 = fm.__dict__[field]
-            self.assertEquals(l1.size, l2.size)
+            self.assertEqual(l1.size, l2.size)
             self.assertTrue((l1 == l2).all())
 
     def test_copying(self):

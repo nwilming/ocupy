@@ -19,27 +19,27 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(((arr-arr_small)**2).sum() < 10**-10)
 
     def test_ismember(self):
-        a = np.array(range(1,100,2))
+        a = np.array(list(range(1,100,2)))
         for x in range(1,100,2):
-            self.assertEquals(utils.ismember(x, a), [True])
+            self.assertEqual(utils.ismember(x, a), [True])
         for x in range(2,100,2):
-            self.assertEquals(utils.ismember(x, a), [False])
-        base = range(1, 100, 2)
+            self.assertEqual(utils.ismember(x, a), [False])
+        base = list(range(1, 100, 2))
         base.extend(base)
         a = np.array(base)
         for x in range(1,100,2):
-            self.assertEquals(utils.ismember(x, a.astype(float)), [True])
+            self.assertEqual(utils.ismember(x, a.astype(float)), [True])
         for x in range(2,100,2):
-            self.assertEquals(utils.ismember(x, a.astype(float)), [False])
+            self.assertEqual(utils.ismember(x, a.astype(float)), [False])
 
     def test_dict_2_mat(self):
-        d = {2:range(1,100), 3:range(1,10), 4: range(1,110)}
+        d = {2:list(range(1,100)), 3:list(range(1,10)), 4: list(range(1,110))}
         self.assertRaises(RuntimeError, lambda: utils.dict_2_mat(d))
         
-        d = {2:range(1,100), 3:range(1,100), 4: range(1,100)}
+        d = {2:list(range(1,100)), 3:list(range(1,100)), 4: list(range(1,100))}
         m = utils.dict_2_mat(d)
         for c in range(1, 5):
-            if c in d.keys():
+            if c in list(d.keys()):
                 self.assertTrue(((np.array(d[c]) == m[c]).all()))
             else:
                 self.assertTrue(np.isnan(m[c]).all())

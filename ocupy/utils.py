@@ -3,7 +3,7 @@
 
 from numpy import asarray
 import numpy as np
-import cPickle
+import pickle
 
 have_image_library=True
 try:
@@ -108,15 +108,15 @@ def dict_2_mat(data, fill = True):
     -------
     numpy array with one more dimension than the values of the input dict
     """
-    if any([type(k) != int for k in data.keys()]):
+    if any([type(k) != int for k in list(data.keys())]):
         raise RuntimeError("Dictionary cannot be converted to matrix, " +
                             "not all keys are ints")
-    base_shape = np.array(data.values()[0]).shape
+    base_shape = np.array(list(data.values())[0]).shape
     result_shape = list(base_shape)
     if fill:
         result_shape.insert(0, max(data.keys()) + 1)
     else:
-        result_shape.insert(0, len(data.keys()))
+        result_shape.insert(0, len(list(data.keys())))
     result = np.empty(result_shape) + np.nan
         
     for (i, (k, v)) in enumerate(data.items()):
@@ -145,7 +145,7 @@ def dict_fun(data, function):
     a dictionary with the same keys as data, such that
     result[key] = function(data[key])
     """
-    return dict((k, function(v)) for k, v in data.items())
+    return dict((k, function(v)) for k, v in list(data.items()))
 
 def snip_string_middle(string, max_len=20, snip_string='...'):
     """
@@ -285,7 +285,7 @@ class Memoize:
         self.memory = {}
 
     def __call__(self, *args, **kwargs):
-        hash_str = cPickle.dumps(args) + cPickle.dumps(kwargs)
+        hash_str = pickle.dumps(args) + pickle.dumps(kwargs)
         if not hash_str in self.memory:
             self.memory[hash_str] = self.function(*args, **kwargs)
         return self.memory[hash_str]

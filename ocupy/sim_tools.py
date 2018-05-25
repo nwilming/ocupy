@@ -1,7 +1,7 @@
 from math import ceil
 import numpy as np
 import random
-import spline_base
+from . import spline_base
 
     
 def anglendiff(fm, roll = 1, return_abs=False):
@@ -38,8 +38,8 @@ def createHist(ld, ad,
     H, xedges, yedges = np.histogram2d(ld[~np.isnan(ld)], ad[~np.isnan(ad)],
                 bins=bins)
     H = H / sum(sum(H))
-    H[:,0]*=2  
-    H[:,-1]*=2
+    #H[:,0]*=2  
+    #H[:,-1]*=2
     return H
     
 def compute_cumsum(fm, arg):
@@ -49,13 +49,13 @@ def compute_cumsum(fm, arg):
                     fm.image_size[1]**2)**0.5))
         y_arg = len[0][np.roll(fm.fix==min(fm.fix),1)]
         x_arg = reshift(ang[0][np.roll(fm.fix==min(fm.fix),1)])
-        bins = [range(screen_diag+1), np.linspace(-180.5,180.5,362)]
+        bins = [list(range(screen_diag+1)), np.linspace(-180.5,180.5,362)]
     
     elif arg == 'coo':
         indexes = fm.fix==min(fm.fix)
         y_arg = fm.y[indexes]
         x_arg = fm.x[indexes]
-        bins = [range(fm.image_size[0]+1), range(fm.image_size[1]+1)]
+        bins = [list(range(fm.image_size[0]+1)), list(range(fm.image_size[1]+1))]
     
     elif arg == 'len':
         trajLen = np.roll(fm.fix,1)[fm.fix==min(fm.fix)]
@@ -99,7 +99,7 @@ def reshift(I):
 def spline(ad,ld,collapse=True,xdim=[-36,36]):
     ld = ld[~np.isnan(ld)]
     ad = reshift(ad[~np.isnan(ad)]) 
-    samples = zip(ld,ad)
+    samples = list(zip(ld,ad))
 
     if collapse: # von 0 bis 181
         e_y = np.linspace(-36.5,36.5,74)
@@ -113,7 +113,7 @@ def spline(ad,ld,collapse=True,xdim=[-36,36]):
         e_x = np.linspace(-180.5,179.5,361)
         e_y = np.linspace(xdim[0],xdim[1],(xdim[1]*2)+1)
         ad[ad>179.5]-=360
-        samples = zip(ld,ad)
+        samples = list(zip(ld,ad))
 
         H = spline_base.spline_pdf(np.array(samples), e_y, e_x, 
                 nr_knots_y = 3, nr_knots_x = 19)

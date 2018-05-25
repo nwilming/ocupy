@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-Convert eye-tracking saples to fixations
+Convert eye-tracking samples to fixations
 '''
 import numpy as np
 from ocupy.datamat import AccumulatorFactory
@@ -70,7 +70,7 @@ def saccade_detection(samplemat, Hz=200, threshold=30,
     for i, (start, end) in enumerate(zip(borders[0::2], borders[1::2])):
         if (1000*(end - start) / float(Hz)) < (min_duration):
             saccade[start:end] = 1
-    
+
     # Delete saccade between fixations that are too close together.
     dists_ok = False
     while not dists_ok:
@@ -140,7 +140,7 @@ def fixation_detection(samplemat, saccades, Hz=200, samples2fix=None,
 
         current = {}
         for k in samplemat.fieldnames():
-            if k in samples2fix.keys():
+            if k in list(samples2fix.keys()):
                 current[k] = samples2fix[k](samplemat, k, start, end)
             else:
                 current[k] = np.mean(samplemat.field(k)[start:end])

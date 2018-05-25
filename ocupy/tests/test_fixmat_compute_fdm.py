@@ -98,12 +98,12 @@ class TestComputeFDM(unittest.TestCase):
 
     def test_relative_bias(self):
         fm = fixmat.TestFixmatFactory(categories = [1,2], 
-                filenumbers = range(1,11),
+                filenumbers = list(range(1,11)),
                 subjectindices = [1, 2, 3, 4, 5, 6],
                 params = {'pixels_per_degree':1, 'image_size':[10,10]})
         rb = fixmat.relative_bias(fm)   
-        self.assertEquals(rb.shape,(21, 21))
-        self.assertEquals(rb[9][9],960)
+        self.assertEqual(rb.shape,(21, 21))
+        self.assertEqual(rb[9][9],960)
 
     def tearDown(self):
         self.fm = None

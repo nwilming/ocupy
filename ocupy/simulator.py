@@ -6,10 +6,10 @@ from math import radians, ceil, floor, cos, sin
 import random
 import ocupy
 from ocupy import fixmat
-import spline_base
+from . import spline_base
 import numpy as np
 import functools  
-import simulator
+from . import simulator
 
 class memoize(object):
     '''Decorator. Caches a function's return value each time it is called.
@@ -156,7 +156,7 @@ class FixGen(AbstractSim):
         for elem in [self.firstLenAng_cumsum, self.trajLen_cumsum]:
             self.linind[elem] = np.linspace(0, 1, 1/min((np.unique((elem))-np.roll(np.unique((elem)),1))[1:]))[0:-1]
         
-    def _calc_xy(self, (x, y), angle, length):
+    def _calc_xy(self, xxx_todo_changeme, angle, length):
         """
         Calculates the coordinates after a specific saccade was made.
         
@@ -169,6 +169,7 @@ class FixGen(AbstractSim):
             length: float or int
                 The length of the next saccade
         """
+        (x, y) = xxx_todo_changeme
         return (x+(cos(radians(angle))*length),
                 y+(sin(radians(angle))*length))
                 
@@ -254,7 +255,7 @@ class FixGen(AbstractSim):
         # XXX: Delete ProgressBar
         pbar = ProgressBar(widgets=[Percentage(),Bar()], maxval=num_samples).start()
         
-        for s in xrange(0, num_samples):
+        for s in range(0, num_samples):
             for i, (xs, ys) in enumerate(self.sample()):
                 x.append(xs)
                 y.append(ys)
@@ -390,7 +391,7 @@ def makeHist(x_val, y_val, fit=spline_base.fit2d,
     y_val = y_val[~np.isnan(y_val)]
     x_val = x_val[~np.isnan(x_val)]
     
-    samples = zip(y_val, x_val)
+    samples = list(zip(y_val, x_val))
     K, xedges, yedges = np.histogram2d(y_val, x_val, bins=bins)
 
     if (fit is None):
@@ -518,7 +519,7 @@ def firstSacDist(fm):
     ang, leng, ad, ld = anglendiff(fm, return_abs=True)
     y_arg = leng[0][np.roll(fm.fix == min(fm.fix), 1)]/fm.pixels_per_degree
     x_arg = reshift(ang[0][np.roll(fm.fix == min(fm.fix), 1)])
-    bins = [range(int(ceil(np.nanmax(y_arg)))+1), np.linspace(-180, 180, 361)]
+    bins = [list(range(int(ceil(np.nanmax(y_arg)))+1)), np.linspace(-180, 180, 361)]
     return makeHist(x_arg, y_arg, fit=None, bins = bins)
     
 def trajLenDist(fm):

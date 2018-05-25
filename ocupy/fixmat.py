@@ -12,7 +12,7 @@ import numpy as np
 from scipy.io import loadmat
 from scipy.ndimage.filters import gaussian_filter
 
-from datamat import Datamat
+from .datamat import Datamat
 
 class FixMat(Datamat):
 
@@ -152,9 +152,9 @@ def load(path):
       fm_group = f['Datamat']
     fields = {}
     params = {}
-    for field, value in fm_group.iteritems():
+    for field, value in list(fm_group.items()):
         fields[field] = np.array(value)
-    for param, value in fm_group.attrs.iteritems():
+    for param, value in list(fm_group.attrs.items()):
         params[param] = value
     f.close()
     return VectorFixmatFactory(fields, params)
@@ -199,7 +199,7 @@ def compute_fdm(fixmat, fwhm=2, scale_factor=1):
     # ]0 binedge[0]] are included. --> fixations are ceiled
     e_y = np.arange(0, np.round(scale_factor*fixmat.image_size[0]+1))
     e_x = np.arange(0, np.round(scale_factor*fixmat.image_size[1]+1))
-    samples = np.array(zip((scale_factor*fixmat.y), (scale_factor*fixmat.x)))
+    samples = np.array(list(zip((scale_factor*fixmat.y), (scale_factor*fixmat.x))))
     (hist, _) = np.histogramdd(samples, (e_y, e_x))
     kernel_sigma = fwhm * fixmat.pixels_per_degree * scale_factor
     kernel_sigma = kernel_sigma / (2 * (2 * np.log(2)) ** .5)
@@ -240,8 +240,8 @@ def relative_bias(fm,  scale_factor = 1, estimator = None):
 
     #e_y = np.arange(-ylim, ylim+1)
     #e_x = np.arange(-xlim, xlim+1)
-    samples = np.array(zip((scale_factor * diff_y),
-                             (scale_factor* diff_x)))
+    samples = np.array(list(zip((scale_factor * diff_y),
+                             (scale_factor* diff_x))))
     if estimator == None:
         (hist, _) = np.histogramdd(samples, (e_y, e_x))
     else:
@@ -292,14 +292,14 @@ def FixmatFactory(fixmatfile, categories = None, var_name = 'fixmat', field_name
     """
     try:
         data = loadmat(fixmatfile, struct_as_record = False)
-        keys = data.keys()
+        keys = list(data.keys())
         data = data[var_name][0][0]
     except KeyError:
         raise RuntimeError('%s is not a field of the matlab structure. Possible'+
                 'Keys are %s'%str(keys))
     
     num_fix = data.__getattribute__(field_name).size
-    
+
     # Get a list with fieldnames and a list with parameters
     fields = {}
     parameters = {}
@@ -313,13 +313,13 @@ def FixmatFactory(fixmatfile, categories = None, var_name = 'fixmat', field_name
     
     # Generate FixMat
     fixmat = FixMat(categories = categories)
-    fixmat._fields = fields.keys()
-    for (field, value) in fields.iteritems():
+    fixmat._fields = list(fields.keys())
+    for (field, value) in list(fields.items()):
         fixmat.__dict__[field] = value.reshape(-1,) 
 
     fixmat._parameters = parameters
     fixmat._subjects = None
-    for (field, value) in parameters.iteritems():
+    for (field, value) in list(parameters.items()):
         fixmat.__dict__[field] = value
     fixmat._num_fix = num_fix
     return fixmat
@@ -370,23 +370,23 @@ def TestFixmatFactory(points = None, categories = [1],
                     np.ones(len(points[0]))))
                 fixmat.filenumber = np.hstack((fixmat.filenumber, img *
                     np.ones(len(points[0]))))
-                fixmat.fix = np.hstack((fixmat.fix, range(0,len(points[0]))))
+                fixmat.fix = np.hstack((fixmat.fix, list(range(0,len(points[0])))))
  
 
     fixmat._fields = ['x', 'y', 'SUBJECTINDEX', 'filenumber', 'category', 'fix']
     fixmat._parameters = default_parameters
-    for (field, value) in default_parameters.iteritems():
+    for (field, value) in list(default_parameters.items()):
         fixmat.__dict__[field] = value
     fixmat._num_fix  = len(fixmat.x)
     return fixmat
 
 def VectorFixmatFactory(fields, parameters, categories = None):
     fm = FixMat(categories = categories)
-    fm._fields = fields.keys()
-    for (field, value) in fields.iteritems(): 
+    fm._fields = list(fields.keys())
+    for (field, value) in list(fields.items()): 
         fm.__dict__[field] = value 
     fm._parameters = parameters
-    for (field, value) in parameters.iteritems(): 
+    for (field, value) in list(parameters.items()): 
        fm.__dict__[field] = value
-    fm._num_fix = len(fm.__dict__[fields.keys()[0]])
+    fm._num_fix = len(fm.__dict__[list(fields.keys())[0]])
     return fm

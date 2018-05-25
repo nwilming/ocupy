@@ -16,7 +16,7 @@ class Categories(object):
         self._fixations = fixations
         self._categories = {}
         self._img_per_cat = img_per_cat
-        for (k, imgs) in img_per_cat.iteritems():
+        for (k, imgs) in list(img_per_cat.items()):
             self._categories.update({k:Images(loader, 
                 imgs, k,features,fixations)})
     
@@ -27,20 +27,20 @@ class Categories(object):
         return self._img_per_cat
 
     def __contains__(self, key):
-        return key in self._categories.keys()
+        return key in list(self._categories.keys())
      
     def __iter__(self):
-        for i in self._categories.values():
+        for i in list(self._categories.values()):
             yield i
     
     def categories(self):
         """
         Returns a list of category numbers
         """
-        return self._categories.keys()
+        return list(self._categories.keys())
 
     def __getitem__(self, key):
-        if not key in self._categories.keys():
+        if not key in list(self._categories.keys()):
             raise IndexError('The requested Category was not '
                 + 'specified beforehand')
         return self._categories[key]
@@ -52,11 +52,11 @@ class Categories(object):
         if not self._fixations:
             raise RuntimeError('This Images object does not have'
                 +' an associated fixmat')
-        if len(self._categories.keys()) == 0:
+        if len(list(self._categories.keys())) == 0:
             return None
         else:
             idx = np.zeros(self._fixations.x.shape, dtype='bool')
-            for (cat, _) in self._categories.iteritems():
+            for (cat, _) in list(self._categories.items()):
                 idx = idx | ((self._fixations.category == cat))
             return self._fixations[idx]
 
@@ -76,20 +76,20 @@ class Images(object):
                 img, features, fixations)})
  
     def __contains__(self, key):
-        return key in self._images.keys()
+        return key in list(self._images.keys())
      
     def __iter__(self):
-        for i in self._images.values():
+        for i in list(self._images.values()):
             yield i
 
     def images(self):
         """
         Returns a list image numbers.
         """
-        return self._images.keys()
+        return list(self._images.keys())
        
     def __getitem__(self, key):
-        if not key in self._images.keys():
+        if not key in list(self._images.keys()):
             raise IndexError('The requested Image was not specified')
         return self._images[key]
     
@@ -99,7 +99,7 @@ class Images(object):
             raise RuntimeError('This Images object does not have'
                 +' an associated fixmat')
         return self._fixations[(self._fixations.category == self.category) &
-                ismember(self._fixations.filenumber, self._images.keys())]   
+                ismember(self._fixations.filenumber, list(self._images.keys()))]   
 
 class Image(object):
     """
@@ -251,7 +251,7 @@ def DirectoryStimuliFactory(loader):
     # if there are no subfolders, walk through files. Take 1 as key for the 
     # categories object
     if not subfolders:
-        [_, _, files] = os.walk(os.path.join(impath)).next()
+        [_, _, files] = next(os.walk(os.path.join(impath)))
         # this only takes entries that end with '.png'
         entries = {1: 
             [int(cur_file[cur_file.find('_')+1:-4]) for cur_file
@@ -261,7 +261,7 @@ def DirectoryStimuliFactory(loader):
     # if there are subfolders, walk through them
     else:
         for directory in subfolders:
-            [_, _, files] = os.walk(os.path.join(impath, directory)).next()
+            [_, _, files] = next(os.walk(os.path.join(impath, directory)))
             # this only takes entries that end with '.png'. Strips ending and
             # considers everything after the first '_' as the imagenumber
             imagenumbers = [int(cur_file[cur_file.find('_')+1:-4]) 
@@ -273,7 +273,7 @@ def DirectoryStimuliFactory(loader):
     del imagenumbers
 
     # in case subfolders do not exist, '' is appended here.
-    _, features, files = os.walk(os.path.join(ftrpath, 
-                                            subfolders[0])).next()
+    _, features, files = next(os.walk(os.path.join(ftrpath, 
+                                            subfolders[0])))
     return Categories(loader, img_per_cat = img_per_cat, features = features)
     

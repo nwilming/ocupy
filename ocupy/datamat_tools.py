@@ -5,7 +5,7 @@ Created on Feb 1, 2012
 
 Things here should eventually be incorporated into the DataMat class itself. 
 '''
-from utils import factorise_strings
+from .utils import factorise_strings
 from numpy import array
 
 def factorise_field(dm, field_name, boundary_char = None, parameter_name=None):
@@ -21,7 +21,7 @@ def factorise_field(dm, field_name, boundary_char = None, parameter_name=None):
     
     old_data = dm.field(field_name)
     
-    if isinstance(old_data[0], str) or isinstance(old_data[0], unicode):
+    if isinstance(old_data[0], str) or isinstance(old_data[0], str):
         (new_data, common) = factorise_strings(old_data, boundary_char)
         new_data = array(new_data)
     else:

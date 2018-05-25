@@ -19,24 +19,24 @@ def set_scores(score_list):
     """
     global scores
     scores = score_list
-        
+
 def prediction_scores(prediction, fm, **kw):
     """
     Evaluates a prediction against fixations in a fixmat with different measures.
-    
-    The default measures which are used are AUC, NSS and KL-divergence. This 
-    can be changed by setting the list of measures with set_scores.  
+
+    The default measures which are used are AUC, NSS and KL-divergence. This
+    can be changed by setting the list of measures with set_scores.
     As different measures need potentially different parameters, the kw
-    dictionary can be used to pass arguments to measures. Every named 
-    argument (except fm and prediction) of a measure that is included in 
+    dictionary can be used to pass arguments to measures. Every named
+    argument (except fm and prediction) of a measure that is included in
     kw.keys() will be filled with the value stored in kw.
     Example:
-    
+
     >>> prediction_scores(P, FM, ctr_loc = (y,x))
-    
+
     In this case the AUC will be computed with control points (y,x), because
     the measure 'roc_model' has 'ctr_loc' as named argument.
-    
+
     Input:
         prediction  :   2D numpy array
             The prediction that should be evaluated
@@ -52,10 +52,10 @@ def prediction_scores(prediction, fm, **kw):
     for measure in scores:
         (args, _, _, _) = inspect.getargspec(measure)
         if len(args)>2:
-            # Filter dictionary, such that only the keys that are 
+            # Filter dictionary, such that only the keys that are
             # expected by the measure are in it
             mdict = {}
-            [mdict.update({key:value}) for (key, value) in kw.iteritems() 
+            [mdict.update({key:value}) for (key, value) in list(kw.items())
                 if key in args]
             score = measure(prediction, fm, **mdict)
         else:
@@ -68,11 +68,11 @@ def funky_test_measure(prediction, fm, arg1 = 'bar', arg2='foo'):
     Measure that can be used for testing
     """
     return arg1 + arg2
-    
+
 def evaluate_predictions(stimuli):
     results = {}
     for cat in stimuli:
-        score = [prediction_scores(img['prediction'], img.fixations) 
+        score = [prediction_scores(img['prediction'], img.fixations)
             for img in cat]
         results.update({cat.category: score})
     return results
@@ -82,9 +82,9 @@ def kldiv_model(prediction, fm):
     wraps kldiv functionality for model evaluation
 
     input:
-        prediction: 2D matrix 
+        prediction: 2D matrix
             the model salience map
-        fm : fixmat 
+        fm : fixmat
             Should be filtered for the image corresponding to the prediction
     """
     (_, r_x) = calc_resize_factor(prediction, fm.image_size)
@@ -103,10 +103,10 @@ def kldiv(p, q, distp = None, distq = None, scale_factor = 1):
         q : Matrix
             The second probability distribution
         distp : fixmat
-            If p is None, distp is used to compute a FDM which 
+            If p is None, distp is used to compute a FDM which
             is then taken as 1st probability distribution.
         distq : fixmat
-            If q is None, distq is used to compute a FDM which is 
+            If q is None, distq is used to compute a FDM which is
             then taken as 2dn probability distribution.
         scale_factor : double
             Determines the size of FDM computed from distq or distp.
@@ -116,7 +116,7 @@ def kldiv(p, q, distp = None, distq = None, scale_factor = 1):
     assert p != None or distp != None, "Either p or distp have to be given"
 
     try:
-        if p == None: 
+        if p == None:
             p = compute_fdm(distp, scale_factor = scale_factor)
         if q == None:
             q = compute_fdm(distq, scale_factor = scale_factor)
@@ -124,15 +124,15 @@ def kldiv(p, q, distp = None, distq = None, scale_factor = 1):
         return np.NaN
 
     q += np.finfo(q.dtype).eps
-    p += np.finfo(p.dtype).eps 
+    p += np.finfo(p.dtype).eps
     kl = np.sum( p * (np.log2(p / q)))
     return kl
-  
+
 def kldiv_cs_model(prediction, fm):
     """
-    Computes Chao-Shen corrected KL-divergence between prediction 
+    Computes Chao-Shen corrected KL-divergence between prediction
     and fdm made from fixations in fm.
-    
+
     Parameters :
         prediction : np.ndarray
             a fixation density map
@@ -151,7 +151,7 @@ def kldiv_cs_model(prediction, fm):
     # ]0 binedge[0]] are included. --> fixations are ceiled
     e_y = np.arange(0, np.round(scale_factor*fm.image_size[0]+1))
     e_x = np.arange(0, np.round(scale_factor*fm.image_size[1]+1))
-    samples = np.array(zip((scale_factor*fm.y), (scale_factor*fm.x)))
+    samples = np.array(list(zip((scale_factor*fm.y), (scale_factor*fm.x))))
     (fdm, _) = np.histogramdd(samples, (e_y, e_x))
 
     # compute ChaoShen corrected kl-div
@@ -162,7 +162,7 @@ def kldiv_cs_model(prediction, fm):
     q = q[fdm > 0]
     cross_entropy = -np.sum((pa * np.log2(q)) / la)
     return (cross_entropy - H)
-    
+
 
 def chao_shen(q):
     """
@@ -179,27 +179,27 @@ def chao_shen(q):
     la = (1 - (1 - pa) ** n)  # probability to see a bin (species) in the sample
     H = -np.sum((pa * np.log2(pa)) / la)
     return (H, pa, la)
- 
+
 
 def correlation_model(prediction, fm):
     """
     wraps numpy.corrcoef functionality for model evaluation
 
     input:
-        prediction: 2D Matrix 
+        prediction: 2D Matrix
             the model salience map
-        fm: fixmat 
+        fm: fixmat
             Used to compute a FDM to which the prediction is compared.
     """
     (_, r_x) = calc_resize_factor(prediction, fm.image_size)
     fdm = compute_fdm(fm, scale_factor = r_x)
     return np.corrcoef(fdm.flatten(), prediction.flatten())[0,1]
-    
-    
+
+
 def nss_model(prediction, fm):
     """
     wraps nss functionality for model evaluation
-    
+
     input:
         prediction: 2D matrix
             the model salience map
@@ -228,14 +228,14 @@ def nss(prediction, fix):
 def roc_model(prediction, fm, ctr_loc = None, ctr_size = None):
     """
     wraps roc functionality for model evaluation
-    
+
     Parameters:
         prediction: 2D array
             the model salience map
         fm : fixmat
             Fixations that define locations of the actuals
         ctr_loc : tuple of (y.x) coordinates, optional
-            Allows to specify control points for spatial 
+            Allows to specify control points for spatial
             bias correction
         ctr_size : two element tuple, optional
             Specifies the assumed image size of the control locations,
@@ -251,7 +251,7 @@ def roc_model(prediction, fm, ctr_loc = None, ctr_size = None):
     y_index = (r_y * np.array(fm.y-1)).astype(int)
     x_index = (r_x * np.array(fm.x-1)).astype(int)
     actuals = prediction[y_index, x_index]
-    if not ctr_loc: 
+    if not ctr_loc:
         xc = np.random.randint(0, prediction.shape[1], 1000)
         yc = np.random.randint(0, prediction.shape[0], 1000)
         ctr_loc = (yc.astype(int), xc.astype(int))
@@ -260,19 +260,19 @@ def roc_model(prediction, fm, ctr_loc = None, ctr_size = None):
             ctr_size = fm.image_size
         else:
             (r_y, r_x) = calc_resize_factor(prediction, ctr_size)
-        ctr_loc = ((r_y * np.array(ctr_loc[0])).astype(int), 
+        ctr_loc = ((r_y * np.array(ctr_loc[0])).astype(int),
                    (r_x * np.array(ctr_loc[1])).astype(int))
     controls = prediction[ctr_loc[0], ctr_loc[1]]
     return fast_roc(actuals, controls)[0]
-    
+
 
 def fast_roc(actuals, controls):
     """
     approximates the area under the roc curve for sets of actuals and controls.
-    Uses all values appearing in actuals as thresholds and lower sum 
+    Uses all values appearing in actuals as thresholds and lower sum
     interpolation. Also returns arrays of the true positive rate and the false
     positive rate that can be used for plotting the roc curve.
-    
+
     Parameters:
         actuals : list
             A list of numeric values for positive observations.
@@ -308,7 +308,7 @@ def fast_roc(actuals, controls):
 
 def faster_roc(actuals, controls):
     """
-    Histogram based implementation of AUC unde ROC curve.  
+    Histogram based implementation of AUC unde ROC curve.
     Parameters:
         actuals : list
             A list of numeric values for positive observations.
@@ -317,7 +317,7 @@ def faster_roc(actuals, controls):
     """
     assert(type(actuals) is np.ndarray)
     assert(type(controls) is np.ndarray)
-    
+
     if len(actuals)<500:
         raise RuntimeError('This method might be incorrect when '+
                 'not enough actuals are present. Needs to be checked before '+
@@ -382,10 +382,10 @@ def exact_roc(actuals, controls):
 def emd_model(prediction, fm):
     """
     wraps emd functionality for model evaluation
-    
+
     requires:
         OpenCV python bindings
-        
+
     input:
         prediction: the model salience map
         fm : fixmat filtered for the image corresponding to the prediction
@@ -396,9 +396,9 @@ def emd_model(prediction, fm):
 
 
 def emd(prediction, ground_truth):
-    """ 
+    """
     Compute the Eart Movers Distance between prediction and model.
-    
+
     This implementation uses opencv for doing the actual work.
     Unfortunately, at the time of implementation only the SWIG
     bindings werer available and the numpy arrays have to
@@ -409,8 +409,8 @@ def emd(prediction, ground_truth):
         raise RuntimeError('Shapes of prediction and ground truth have' +
                            ' to be equal. They are: %s, %s'
                             %(str(prediction.shape), str(ground_truth.shape)))
-    (x, y) = np.meshgrid(range(0, prediction.shape[1]),
-                        range(0, prediction.shape[0]))    
+    (x, y) = np.meshgrid(list(range(0, prediction.shape[1])),
+                        list(range(0, prediction.shape[0])))
     s1 = np.array([x.flatten(), y.flatten(), prediction.flatten()]).T
     s2 = np.array([x.flatten(), y.flatten(), ground_truth.flatten()]).T
     s1m = opencv.cvCreateMat(s1.shape[0], s2.shape[1], opencv.CV_32FC1)
@@ -422,7 +422,5 @@ def emd(prediction, ground_truth):
     d = opencv.cvCalcEMD2(s1m, s2m, opencv.CV_DIST_L2)
     return d
 
-# Default list of measures 
+# Default list of measures
 scores = [roc_model, nss_model, kldiv_model, correlation_model]
-
-

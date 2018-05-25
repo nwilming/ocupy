@@ -1,6 +1,6 @@
 import numpy as np
 from multiprocessing import pool
-from scipy.stats import nanmean
+from scipy import nanmean
 from ocupy.simulator import anglendiff, reshift
 from scipy.optimize import leastsq
 
@@ -83,7 +83,7 @@ def ior_effect(durations, angle_diffs, length_diffs,
         result = p.map(summary_stat, list(raster.flatten()))
         p.terminate()
     else:
-        result = map(summary_stat, list(raster.flatten()))
+        result = list(map(summary_stat, list(raster.flatten())))
     for idx, value in enumerate(result):
         i, j = np.unravel_index(idx, raster.shape)
         raster[i, j] = value
